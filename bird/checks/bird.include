@@ -1,0 +1,416 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
+#
+# This file is part of the check_mk bird check.
+#
+# The check_mk bird check is free software: you can redistribute it
+# and/or modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# The check_mk bird check is distributed in the hope that it will
+# be useful, but WITHOUT ANY WARRANTY; without even the implied
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with it. If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2014 by Frederik Kriewitz <frederik@kriewitz.eu>.
+
+# Example data from agent:
+# <<<bird>>>
+# 0001 BIRD 1.4.3 ready.
+# 1000 BIRD 1.4.3
+# 1011 Router ID is 192.0.2.125
+# 1011     Current server time is 2014-06-05 16:26:52
+# 1011     Last reboot on 2014-06-02 17:15:23
+# 1011     Last reconfiguration on 2014-06-03 14:37:54
+# 0013 Daemon is up and running
+# 1018 BIRD memory usage
+# 1018     Routing tables:    137 MB
+# 1018     Route attributes:   73 MB
+# 1018     ROA tables:        192  B
+# 1018     Protocols:        1697 kB
+# 1018     Total:             211 MB
+# 2002 name     proto    table    state  since       info
+# 1002 o_test   OSPF     t_o_test up     2014-06-02 17:15:23  Running
+# 1006   Preference:     150
+# 1006       Input filter:   ACCEPT
+# 1006       Output filter:  (unnamed)
+# 1006       Routes:         421 imported, 458 exported, 1260 preferred
+# 1006       Route change stats:     received   rejected   filtered    ignored   accepted
+# 1006         Import updates:            469          0          0          0        469
+# 1006         Import withdraws:            9          0        ---          0          9
+# 1006         Export updates:            933        468          0        ---        465
+# 1006         Export withdraws:           15        ---        ---        ---          7
+# 1006
+# 1002 b_error_test BGP      t_b_test start  2014-06-02 17:15:23  Connect       Socket: Network is unreachable
+# 1006   Preference:     100
+# 1006       Input filter:   REJECT
+# 1006       Output filter:  ACCEPT
+# 1006       Routes:         0 imported, 0 exported, 0 preferred
+# 1006       Route change stats:     received   rejected   filtered    ignored   accepted
+# 1006         Import updates:              0          0          0          0          0
+# 1006         Import withdraws:            0          0        ---          0          0
+# 1006         Export updates:              0          0          0        ---          0
+# 1006         Export withdraws:            0        ---        ---        ---          0
+# 1006       BGP state:          Connect
+# 1006         Neighbor address: 192.0.2.6
+# 1006         Neighbor AS:      65535
+# 1006         Last error:       Socket: Network is unreachable
+# 1006
+# 1002 b_spamhouse1 BGP      t_b_blackhole up     2014-06-02 17:23:02  Established
+# 1006   Description:    blackhole from spamhouse
+# 1006   Preference:     40000
+# 1006       Input filter:   b_spamhouse_in
+# 1006       Output filter:  REJECT
+# 1006       Import limit:   2000
+# 1006         Action:       restart
+# 1006       Routes:         1102 imported, 0 filtered, 0 exported, 3306 preferred
+# 1006       Route change stats:     received   rejected   filtered    ignored   accepted
+# 1006         Import updates:           1102          0          0          0       1102
+# 1006         Import withdraws:            0          0        ---          0          0
+# 1006         Export updates:           1105       1105          0        ---          0
+# 1006         Export withdraws:            2        ---        ---        ---          0
+# 1006       BGP state:          Established
+# 1006         Neighbor address: 94.228.136.140
+# 1006         Neighbor AS:      65190
+# 1006         Neighbor ID:      94.228.136.140
+# 1006         Neighbor caps:    refresh AS4
+# 1006         Session:          external multihop AS4
+# 1006         Source address:   192.0.2.125
+# 1006         Route limit:      1102/2000
+# 1006         Hold timer:       117/180
+# 1006         Keepalive timer:  25/60
+# 1006
+# 1013 o_test:
+# 1013     Router ID      Pri          State      DTime   Interface  Router IP
+# 1013     192.0.2.126          1         full/bdr    00:08   vlan811    192.0.2.126
+# 10000 1401799073 /etc/bird/bird.conf
+# 10000 1401204399 /etc/bird/bird.conf.common
+# 10000 1399909638 /etc/bird/bird.conf.local
+
+
+import operator
+import datetime
+
+factory_settings["bird_status_default_levels"] = {
+    "uptime_low_threshold": 300,
+    "config_file_min_age": 60,
+}
+
+def bird_strptime(string):
+    # bird uses different time formats depending on the version/settings
+    for f in ['%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']:
+        try:
+            return datetime.datetime.strptime(string, f)
+        except ValueError:
+            pass
+    raise ValueError("no timeformat matched %s" % (string))
+
+
+def bird_si_to_int(value, unit):
+    _prefix = {'': 1, 'k': 1024, 'M': 1048576, 'G': 1073741824}
+    return int(value) * _prefix[unit.rstrip('B')]
+
+def bird_x_to_key(value):
+    return "_".join(value).rstrip(':')
+
+def parse_bird(info):
+    data = {}
+    last_protocol = None
+    for line in info:
+        code = int(line[0])
+        if 8000 <= code <= 9999:
+            data['error'] = " ".join(line[1:])
+        if code == 1000:
+            data['version'] = line[2]
+        elif code == 1011:
+            status = data.setdefault('status', {})
+            if line[1] == 'Router' and line[2] == 'ID':
+                status['router_id'] = line[4]
+	    elif line[1] == 'Current' and line[2] == 'server' and line[3] == 'time':
+                status['server_time'] = bird_strptime(" ".join(line[5:7]))
+	    elif line[1] == 'Last' and line[2] == 'reboot':
+                status['last_reboot'] = bird_strptime(" ".join(line[4:6]))
+            elif line[1] == 'Last' and line[2] == 'reconfiguration':
+                status['last_reconfiguration'] = bird_strptime(" ".join(line[4:6]))
+        elif code == 24:
+            graceful_restart_recovery_msgs = data['status'].setdefault('graceful_restart_recovery_msgs', [])
+            graceful_restart_recovery_msgs.append(" ".join(line[1:]))
+        elif code == 13:
+            data['status']['msg'] = " ".join(line[1:])
+        elif code == 1018:
+	    if line[-1][-1] == 'B': # ignore lines which don't end vith B (not memory stats)
+                memory = data.setdefault('memory', [])
+                name = " ".join(line[1:-2]).rstrip(":")
+                value_text = " ".join(line[-2:])
+                value_bytes = bird_si_to_int(line[-2], line[-1])
+                memory.append((name, value_text, value_bytes))
+        elif code == 1002:
+            protocols = data.setdefault('protocols', {})
+            last_protocol = protocols[line[1]] = {'proto': line[2], 'table': line[3], 'state': line[4]}
+            try:
+                # try to get absolute time (works in case "timeformat protocol iso long;" is configured)
+                last_protocol['since'] = bird_strptime(" ".join(line[5:7]))
+                last_protocol['info'] = " ".join(line[7:])
+            except ValueError:
+                last_protocol['since'] = line[5]
+                last_protocol['info'] = " ".join(line[6:])
+        elif code == 1006:
+            if len(line) == 1:
+                continue
+            if line[1] == "Description:":
+                last_protocol['description'] = " ".join(line[2:])
+            if line[1] == "Preference:":
+                last_protocol['preference'] = line[2]
+            elif line[2] == "filter:":
+                key = bird_x_to_key(line[1:3])
+                last_protocol[key] = " ".join(line[3:])
+            elif line[2] == "limit:" and line[1] != 'Route':
+                limits = last_protocol.setdefault('limits', {})
+                last_limit = limits[line[1]] = {}
+                last_limit['value'] = int(line[3])
+                last_limit['hit'] = (len(line) >= 5 and line[4] == "[HIT]")
+            elif line[1] == "Action:":
+                last_limit['action'] = line[2]
+            elif line[2] == "limit:" and line[1] == 'Route': # legacy "route limit" option
+                limits = last_protocol.setdefault('limits', {})
+                if 'Import' in limits:
+                    continue # ignore in case we already have a import limit
+                last_limit = limits['Import'] = {}
+                last_limit['value'] = int(line[3].split("/")[1])
+                last_limit['hit'] = False
+                last_limit['action'] = "restart"
+            elif line[1] == "Routes:":
+                route_stats = last_protocol['route_stats'] = {}
+                for i in xrange(2,len(line),2):
+                    route_stats[line[i+1].rstrip(",")] = int(line[i])
+            elif line[1] == "Route" and line[2] == "change" and line[3] == "stats:":
+                route_change_stats_fields = line[4:]
+                route_change_stats = last_protocol['route_change_stats'] = {}
+            elif line[1] in ('Import', 'Export') and line[2] in ('updates:', 'withdraws:'):
+                key = bird_x_to_key(line[1:3])
+                route_change_stats[key] = {}
+                for field, value in zip(route_change_stats_fields, line[3:]):
+                    if value == "---":
+                        continue
+                    route_change_stats[key][field] = int(value)
+        elif code == 1013:
+            if line[1][-1] == ":":
+                last_protocol = protocols[line[1][:-1]]
+                last_protocol['neighbours'] = []
+            elif len(line) == 7: # neighbours
+                neighbour = {}
+                for field, value in zip(['Router_ID', 'Pri', 'State', 'DTime', 'Interface', 'Router_IP'], line[1:]):
+                    neighbour[field] = value
+                last_protocol['neighbours'].append(neighbour)
+        elif code == 10000:
+            data.setdefault('config_files', []).append((" ".join(line[2:]), datetime.datetime.fromtimestamp(int(line[1]))))
+
+    return data
+
+def inventory_bird_status(info):
+    data = parse_bird(info)
+    inventory = []
+    if 'status' in data: # bird is running
+        inventory.append((None, data))
+
+    return inventory
+
+
+def check_bird_status(item, params, info):
+    # params is a snapshot of the parsed data at the point of time of inventory
+    data = parse_bird(info)
+    if 'error' in data:
+        return 3, "ERROR: "+data['error']
+    if 'status' not in data:
+        return 3, "No status information available"
+    status = data['status']
+    if 'msg' not in status:
+        return 3, "No status message available"
+
+    uptime = status['server_time'] - status['last_reboot']
+    time_since_last_reconfiguration = status['server_time'] - status['last_reconfiguration']
+    infotxts = []
+    perfdata = [('uptime', uptime.total_seconds()), ('time_since_last_reconfiguration', time_since_last_reconfiguration.total_seconds())]
+    state = 0
+    infotxts.append("version %s" % (data['version']))
+    if status['msg'] == "Shutdown in progress":
+        infotxts.append(status['msg']+"(!!)")
+        state = max(state, 2)
+    elif 'graceful_restart_recovery_msgs' in status:
+        print status['graceful_restart_recovery_msgs']
+        infotxts += status['graceful_restart_recovery_msgs']
+        infotxts[-len(status['graceful_restart_recovery_msgs'])] += "(!)"
+        state = max(state, 1)
+    elif status['msg'] == "Reconfiguration in progress":
+        infotxts.append(status['msg']+"(!)")
+        state = max(state, 1)
+    elif status['msg'] == "Daemon is up and running":
+        infotxts.append("up since %s" % (str(uptime).replace(",", " and")))
+        if uptime < datetime.timedelta(seconds=params['uptime_low_threshold']):
+            infotxts[-1] += "(!)"
+            state = max(state, 1)
+
+        infotxts.append("last reconfiguration: %s" % (status['last_reconfiguration']))
+        for config_file, mtime in data.get('config_files', []):
+            if mtime > status['last_reconfiguration'] and (status['server_time'] - mtime) >= datetime.timedelta(seconds=params['config_file_min_age']):
+                infotxts.append("%s was modified since last reconfiguration(!)" % (config_file))
+                state = max(state, 1)
+    else:
+        infotxts.append("Unknown status: %s" % (status['msg']))
+        state = max(state, 4)
+
+    return state, ", ".join(infotxts), perfdata
+
+
+def inventory_bird_memory(info):
+    data = parse_bird(info)
+    inventory = []
+    if 'memory' in data: # bird is running
+        inventory.append((None, data))
+
+    return inventory
+
+def check_bird_memory(item, params, info):
+    # params is a snapshot of the parsed data at the point of time of inventory
+    data = parse_bird(info)
+    if 'error' in data:
+        return 3, "ERROR: "+data['error']
+    if 'memory' not in data:
+        return 3, "No memory data available"
+    memory = data['memory']
+    perfdata = []
+    infotxts = []
+    state = 0
+    for name, value_text, value_bytes in memory:
+        key = name.replace(" ", "_")
+        value_mb = value_bytes/1048576
+        marker = ""
+        warn_bytes = crit_bytes = None
+        warn, crit = params.get('memory_levels_'+key, (None, None))
+        for limit, new_state in [(crit, 2), (warn, 1)]:
+            if limit != None and value_mb > limit:
+                marker = " above limit %i MB(%s)" % (limit, "!"*new_state)
+                state = max(state, new_state)
+                break
+
+        infotxts.append("%s: %s%s" % (name, value_text, marker))
+        perfdata.append((key, value_bytes, warn*1048576 if warn != None else None, crit*1048576 if crit != None else None))
+
+    return state, ", ".join(infotxts), perfdata
+
+def inventory_bird_protocols(info):
+    data = parse_bird(info)
+    inventory = []
+    if 'protocols' in data: # bird is running
+        for protocol in data['protocols']:
+            inventory.append((protocol, data))
+
+    return inventory
+
+def check_bird_protocols(item, params, info):
+    # params is a snapshot of the parsed data at the point of time of inventory
+    data = parse_bird(info)
+    if 'error' in data:
+        return 3, "ERROR: "+data['error']
+    if 'protocols' not in data:
+        return 3, "No protocol information available"
+    if item not in data['protocols']:
+        return 3, "The protocol no longer exists"
+    protocol = data['protocols'][item]
+    protocol_inventory = params.setdefault('protocols', {}).get(item)
+    if protocol_inventory == None:
+        return 3, "inventory data is missing"
+
+    perfdata = []
+    infotxts = []
+
+    if 'description' in protocol:
+        infotxts.append(protocol['description'])
+
+    if protocol['state'] in ["up"] or protocol['state'] == protocol_inventory['state']:
+        state = 0;
+        marker = ""
+    elif protocol['state'] in ["start", "wait", "feed"]:
+        state = 1;
+        marker = "(!)"
+    elif protocol['state'] in ["stop", "flush", "down"]:
+        state = 2;
+        marker = "(!!)"
+    else:
+        state = 3;
+        marker = ""
+
+    if type(protocol['since']) == datetime.datetime:
+        since_delta = data['status']['server_time'] - protocol['since']
+        since_str = str(since_delta)
+        perfdata.append(('since', since_delta.total_seconds()))
+    else:
+        since_str = protocol['since']
+    infotxt = "%s%s since %s" % (protocol['state'], marker, since_str)
+    if protocol['info']:
+        marker = ""
+        if protocol['proto'] == "OSPF" and protocol['info'] != "Running" and protocol['info'] != protocol_inventory['info']:
+            marker = "(!)"
+            state = max(state, 1)
+        elif protocol['proto'] == "BGP" and protocol['info'] != "Established" and protocol['info'] != protocol_inventory['info']:
+            marker = "(!)"
+            state = max(state, 1)
+        infotxt += " (%s%s)" % (protocol['info'], marker)
+    infotxts.append(infotxt)
+
+    for limit_name, limit in protocol.get('limits', {}).items():
+        if limit['hit']:
+            if limit['action'] == "warn":
+                state = max(state, 1)
+                marker = "(!)"
+            else:
+                state = max(state, 2)
+                marker = "(!!)"
+            infotxts.append("%s limit (%d) hit%s" % (limit_name, limit['value'], marker))
+
+    route_stats_levels = params.get('route_stats_levels', {})
+    for key, value in protocol.get('route_stats', {}).items():
+        infotxt = "%i %s" % (value, key)
+        bounds = {}
+        if key in route_stats_levels:
+            bounds = route_stats_levels[key]
+            for bound, operation, txt in [("lower", operator.le, "is below"), ("upper", operator.ge, "is above")]:
+                if bound in bounds:
+                    warn, crit = bounds[bound]
+                    for level, marker, error_state in [(crit, "!!", 2), (warn, "!", 1)]:
+                        if operation(value, level):
+                            infotxt += " %s %i (%s)" % (txt, level, marker)
+                            state = max(state, error_state)
+                            break;
+        infotxts.append(infotxt)
+        perfdata.append(("route_stats_"+key, value, bounds.get('lower', (None, None))[0], bounds.get('lower', (None, None))[1], bounds.get('upper', (None, None))[0], bounds.get('upper', (None, None))[1]))
+
+    for key, values in protocol.get('route_change_stats', {}).items():
+        perfdata.append(("route_change_stats_"+key, values.get('received'), values.get('rejected'), values.get('filtered'), values.get('ignored'), values.get('accepted')))
+
+
+    if protocol['proto'] == "OSPF":
+        neighbours_count = len(protocol['neighbours'])
+        neighbours_inventory_count = len(protocol_inventory['neighbours'])
+        perfdata.append(("neighbours", neighbours_count, None, None, None, None))
+
+        infotxt = "%i neighbours" % (neighbours_count)
+        if neighbours_count != neighbours_inventory_count:
+            infotxt += "(!) (was %i during inventory)" % (neighbours_inventory_count)
+            state = max(state, 1)
+        infotxts.append(infotxt)
+
+        for neighbour in protocol['neighbours']:
+            neighbour_state = neighbour['State'].split("/")[0]
+            if neighbour_state != "full":
+                infotxts.append("state of %s is %s(!)" % (neighbour['Router_IP'], neighbour_state))
+                state = max(state, 1)
+
+
+    return state, ", ".join(infotxts), perfdata
+

@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# check_mk_agent plugin to dump the bird(6) status
+# works without socat/netcat
+#
+# This file is part of the check_mk bird check.
+#
+# The check_mk bird check is free software: you can redistribute it
+# and/or modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# The check_mk bird check is distributed in the hope that it will
+# be useful, but WITHOUT ANY WARRANTY; without even the implied
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with it. If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2014 by Frederik Kriewitz <frederik@kriewitz.eu>.
+
+MODIFIER='{if($1 ~ /^[0-9][0-9][0-9][0-9]\-/) {code=substr($1,0,4);print code, substr($0,6)} else if ($0 ~ /^ /) {print code $0} else {print}}'
+
+for VERSION in "" "6"
+do
+	BIRDC="birdc$VERSION"
+	which $BIRDC >/dev/null || continue # skip versions which aren't installed
+
+	echo "<<<bird$VERSION>>>"
+	STATUS=$(echo -n | $BIRDC -v show status 2>&1)
+	RESULT=$?
+	if [ $RESULT -eq 0 ]
+	then
+		echo "$STATUS" | awk "$MODIFIER"
+		echo -n | $BIRDC -v show memory | grep -v "^0001 " | awk "$MODIFIER"
+		PROTOCOLS_ALL=$(echo -n | $BIRDC -v show protocols all | grep -v "^0001 " | awk "$MODIFIER")
+		echo "$PROTOCOLS_ALL"
+		PROTOCOLS_SUM=$(echo "$PROTOCOLS_ALL" | sed -n 's/^1002 //p')
+		PROTOCOLS_OSPF=$(echo "$PROTOCOLS_SUM" | awk '{ if($2=="OSPF") print $1 }')
+		for PROTOCOL in $PROTOCOLS_OSPF
+		do
+			echo -n | $BIRDC -v show ospf neighbors "$PROTOCOL" | grep -v "^0001" | awk "$MODIFIER"
+		done
+
+		# dump modified time for config file(s)
+		ls -ln --time-style=+%s /etc/bird$VERSION\.* /etc/bird/bird$VERSION\.* 2>/dev/null | awk '{$1=$2=$3=$4=$5=""; sub(/^[ ]+ /, ""); print "10000 "$0}'
+	else
+		echo "9999 $STATUS"
+	fi
+done

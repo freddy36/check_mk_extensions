@@ -1,0 +1,51 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
+#
+# This file is part of the check_mk bird check.
+#
+# The check_mk bird check is free software: you can redistribute it
+# and/or modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# The check_mk bird check is distributed in the hope that it will
+# be useful, but WITHOUT ANY WARRANTY; without even the implied
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with it. If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2014 by Frederik Kriewitz <frederik@kriewitz.eu>.
+
+
+check_includes['bird6'] = [ "bird.include" ]
+
+check_info["bird6.status"] = {
+    'check_function':           check_bird_status,
+    'inventory_function':       inventory_bird_status,
+    'has_perfdata':             True,
+    'service_description':      'BIRD6 Status',
+    'default_levels_variable':  'bird_status_default_levels',
+    'group':                    'bird_status'
+}
+
+check_info["bird6.memory"] = {
+    'check_function':           check_bird_memory,
+    'inventory_function':       inventory_bird_memory,
+    'has_perfdata':             True,
+    'service_description':      'BIRD6 Memory',
+    'default_levels_variable':  'bird_memory_default_levels',
+    'group':                    'bird6_memory'
+}
+
+check_info["bird6.protocols"] = {
+    'check_function':           check_bird_protocols,
+    'inventory_function':       inventory_bird_protocols,
+    'has_perfdata':             True,
+    'service_description':      'BIRD6 Protocol %s',
+    'default_levels_variable':  'bird_protocols_default_levels',
+    'group':                    'bird6_protocols'
+}
+

@@ -16,30 +16,32 @@
 #
 # Copyright 2014 by Frederik Kriewitz <frederik@kriewitz.eu>.
 
-$opt[1] = "-l 0 -b 1024 --title \"".str_replace("_", " ", $servicedesc)." Usage on $hostname\" ";
+$bird_prefix = strtok($this->MACRO['DISP_SERVICEDESC'], ' '); # Service description up to the first space (BIRD/BIRD6)
 
-$colors = array("#00cc00","#0066b3","#ff8000","#ffcc00","#ccff00","#808080","#008f00","#00487d","#b35a00","#b38f00","#6b006b","#8fb300","#b30000");
+$opt[1] = "-l 0 -b 1024 --title '".$this->MACRO['DISP_HOSTNAME']." / ".$bird_prefix." - Memory usage' ";
+
+$scheme = array("#00cc00","#0066b3","#ff8000","#e7298a","#008f00","#00487d","#b35a00","#b38f00","#6b006b","#8fb300","#b30000");
+
 $def[1] = "";
+foreach($this->DS as $i => $ds)
+{
+    $ds['DESC'] = str_replace("_", " ", $ds['LABEL']);
 
-foreach ($RRDFILE as $i => $file) {
-    $filename = basename($file);
-    $fileprefixlength = strlen($servicedesc)+1;
-    $key = substr($filename, $fileprefixlength, -4);
-    $desc = str_replace("_", " ", $key);
-
-    $def[1] .= "DEF:$key=$file:1:MAX ";
-    if($key == "Total") {
-        $def[1] .= "LINE:$key#000000:\"$desc".str_repeat(" ", 20 - strlen($desc))."\" ";
-        if($WARN[$i] > 0)
-            $def[1] .= "HRULE:$WARN[$i]#FFFF00 ";
-        if($CRIT[$i] > 0)
-            $def[1] .= "HRULE:$CRIT[$i]#FF0000 ";
-    } else {
-        $def[1] .= "AREA:$key$colors[$i]:\"$desc".str_repeat(" ", 20 - strlen($desc))."\":STACK ";
+    $def[1] .= rrd::def($ds['NAME'], $ds['RRDFILE'], $ds['DS'], 'MAX');
+    if($ds['NAME'] == "Total") {
+    if($ds['WARN'] > 0 && $ds['CRIT'] > 0) {
+        $def[1] .= rrd::hrule($ds['WARN'], "#FFFF00");
+        $def[1] .= rrd::hrule($ds['CRIT'], "#FF0000");
+        $def[1] .= rrd::ticker($ds['NAME'], $ds['WARN'], $ds['CRIT'], -0.01);
     }
-    $def[1] .= "GPRINT:$key:LAST:\"%6.0lf %sB last\" ";
-    $def[1] .= "GPRINT:$key:AVERAGE:\"%6.0lf %sB avg\" ";
-    $def[1] .= "GPRINT:$key:MAX:\"%6.0lf %sB max\\n\" ";
+        $def[1] .= rrd::line1($ds['NAME'], '#000000', rrd::cut($ds['DESC'], 20));
+    } else {
+        $def[1] .= rrd::area($ds['NAME'], rrd::color($i, '', $scheme), rrd::cut($ds['DESC'], 20), True);
+    }
+    $def[1] .= rrd::gprint($ds['NAME'], 'LAST', "%6.0lf %sB LAST");
+    $def[1] .= rrd::gprint($ds['NAME'], 'AVERAGE', "%6.0lf %sB AVG");
+    $def[1] .= rrd::gprint($ds['NAME'], 'MAX', "%6.0lf %sB MAX");
 }
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
+?>

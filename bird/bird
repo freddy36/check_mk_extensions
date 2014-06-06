@@ -16,6 +16,9 @@
            'doc': [
                   ],
            'pnp-templates': [
+                             'check_mk-bird.status.include.php',
+                             'check_mk-bird.status.php',
+                             'check_mk-bird6.status.php',
                              'check_mk-bird.memory.include.php',
                              'check_mk-bird.memory.php',
                              'check_mk-bird6.memory.php',

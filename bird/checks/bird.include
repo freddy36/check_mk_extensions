@@ -397,12 +397,9 @@ def check_bird_protocols(item, params, info):
         for field, value in sorted(values):
             if value == None:
                 continue
-            try:
-                perfkey = "route_change_stats_%s_%s" % (key, field)
-                timedif, rate = get_counter("bird.protocols.%s.%s" % (item, perfkey), this_time, value)
-                perfdata.append((perfkey, rate))
-            except MKCounterWrapped:
-                pass # ignore coutner in case of wrap
+            
+            perfkey = "route_change_stats_%s_%s" % (key, field)
+            perfdata.append((perfkey, str(value)+'c'))
 
 
     if protocol['proto'] == "OSPF":

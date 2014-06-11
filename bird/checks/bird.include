@@ -131,9 +131,9 @@ def parse_bird(info):
             status = data.setdefault('status', {})
             if line[1] == 'Router' and line[2] == 'ID':
                 status['router_id'] = line[4]
-	    elif line[1] == 'Current' and line[2] == 'server' and line[3] == 'time':
+            elif line[1] == 'Current' and line[2] == 'server' and line[3] == 'time':
                 status['server_time'] = bird_strptime(" ".join(line[5:7]))
-	    elif line[1] == 'Last' and line[2] == 'reboot':
+            elif line[1] == 'Last' and line[2] == 'reboot':
                 status['last_reboot'] = bird_strptime(" ".join(line[4:6]))
             elif line[1] == 'Last' and line[2] == 'reconfiguration':
                 status['last_reconfiguration'] = bird_strptime(" ".join(line[4:6]))
@@ -143,7 +143,7 @@ def parse_bird(info):
         elif code == 13:
             data['status']['msg'] = " ".join(line[1:])
         elif code == 1018:
-	    if line[-1][-1] == 'B': # ignore lines which don't end vith B (not memory stats)
+            if line[-1][-1] == 'B': # ignore lines which don't end vith B (not memory stats)
                 memory = data.setdefault('memory', [])
                 name = " ".join(line[1:-2]).rstrip(":")
                 value_text = " ".join(line[-2:])
@@ -198,7 +198,7 @@ def parse_bird(info):
                     if value == "---":
                         value = None
                     else:
-	                value = saveint(value)
+                        value = saveint(value)
                     route_change_stats[key].append((field, value))
         elif code == 1013:
             if line[1][-1] == ":":
@@ -244,7 +244,6 @@ def check_bird_status(item, params, info):
         infotxts.append(status['msg']+"(!!)")
         state = max(state, 2)
     elif 'graceful_restart_recovery_msgs' in status:
-        print status['graceful_restart_recovery_msgs']
         infotxts += status['graceful_restart_recovery_msgs']
         infotxts[-len(status['graceful_restart_recovery_msgs'])] += "(!)"
         state = max(state, 1)

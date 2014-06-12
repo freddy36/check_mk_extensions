@@ -22,6 +22,9 @@
                              'check_mk-bird.memory.include.php',
                              'check_mk-bird.memory.php',
                              'check_mk-bird6.memory.php',
+                             'check_mk-bird.protocols.include.php',
+                             'check_mk-bird.protocols.php',
+                             'check_mk-bird6.protocols.php',
                              ],
            'web': [
                    'plugins/perfometer/bird.py',

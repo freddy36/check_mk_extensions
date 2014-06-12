@@ -390,7 +390,9 @@ def check_bird_protocols(item, params, info):
                             state = max(state, error_state)
                             break;
         infotxts.append(infotxt)
-        perfdata.append(("route_stats_"+key, value, bounds.get('lower', (None, None))[0], bounds.get('lower', (None, None))[1], bounds.get('upper', (None, None))[0], bounds.get('upper', (None, None))[1]))
+        warn = "%s:%s" % (bounds.get('lower', ('~', '~'))[0], bounds.get('upper', ('', ''))[0])
+        crit = "%s:%s" % (bounds.get('lower', ('~', '~'))[1], bounds.get('upper', ('', ''))[1])
+        perfdata.append(("route_stats_"+key, value, warn, crit))
 
     for key, values in protocol.get('route_change_stats', {}).items():
         for field, value in sorted(values):

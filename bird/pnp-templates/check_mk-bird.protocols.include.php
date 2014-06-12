@@ -61,7 +61,7 @@ foreach($DS_BY_NAME as $name => $ds)
 
         $i = $ds['INDEX'];
 
-        $opt[$i] = "--vertical-label 'Routes' --title '".$this->MACRO['DISP_HOSTNAME']." / ".$this->MACRO['DISP_SERVICEDESC']."' ";
+        $opt[$i] = "--vertical-label 'Routes' -l0 --title '".$this->MACRO['DISP_HOSTNAME']." / ".$this->MACRO['DISP_SERVICEDESC']."' ";
 
         $def[$i] = "";
         $def[$i] .= rrd::def($ds['NAME'], $ds['RRDFILE'], $ds['DS'], 'MAX');

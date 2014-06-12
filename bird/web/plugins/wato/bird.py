@@ -95,6 +95,9 @@ bird_protocols_valuespec = Dictionary(
             	]
             )
         ),
+        ( "route_stats_levels_limit_warning_factor",
+            Percentage(title = _("Warning level for limit based thresholds"), unit = _("percent"), default_value = 90, minvalue = 0, maxvalue = 100),
+        )
     ]
 )
 

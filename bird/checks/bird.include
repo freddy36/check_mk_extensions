@@ -101,6 +101,10 @@ factory_settings["bird_status_default_levels"] = {
     "config_file_min_age": 60,
 }
 
+factory_settings["bird_protocols_default_levels"] = {
+    "route_stats_levels_limit_warning_factor": 90.0,
+}
+
 def bird_strptime(string):
     # bird uses different time formats depending on the version/settings
     for f in ['%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']:
@@ -365,7 +369,12 @@ def check_bird_protocols(item, params, info):
         infotxt += " (%s%s)" % (protocol['info'], marker)
     infotxts.append(infotxt)
 
+    limit_bounds = {}
     for limit_name, limit in protocol.get('limits', {}).items():
+        route_stats_levels_key = limit_name.lower().rstrip('e')+"ed"
+        crit = limit['value']
+        warn = int(params['route_stats_levels_limit_warning_factor']/100.0 * crit)
+        limit_bounds[route_stats_levels_key] = { 'upper': (warn, crit) }
         if limit['hit']:
             if limit['action'] == "warn":
                 state = max(state, 1)
@@ -378,17 +387,17 @@ def check_bird_protocols(item, params, info):
     route_stats_levels = params.get('route_stats_levels', {})
     for key, value in protocol.get('route_stats', {}).items():
         infotxt = "%i %s" % (value, key)
-        bounds = {}
+        bounds = limit_bounds.get(key, {})
         if key in route_stats_levels:
-            bounds = route_stats_levels[key]
-            for bound, operation, txt in [("lower", operator.le, "is below"), ("upper", operator.ge, "is above")]:
-                if bound in bounds:
-                    warn, crit = bounds[bound]
-                    for level, marker, error_state in [(crit, "!!", 2), (warn, "!", 1)]:
-                        if operation(value, level):
-                            infotxt += " %s %i (%s)" % (txt, level, marker)
-                            state = max(state, error_state)
-                            break;
+            bounds.update(route_stats_levels[key])
+        for bound, operation, txt in [("lower", operator.le, "is below"), ("upper", operator.ge, "is above")]:
+            if bound in bounds:
+                 warn, crit = bounds[bound]
+                 for level, marker, error_state in [(crit, "!!", 2), (warn, "!", 1)]:
+                     if operation(value, level):
+                         infotxt += " %s %i (%s)" % (txt, level, marker)
+                         state = max(state, error_state)
+                         break
         infotxts.append(infotxt)
         warn = "%s:%s" % (bounds.get('lower', ('~', '~'))[0], bounds.get('upper', ('', ''))[0])
         crit = "%s:%s" % (bounds.get('lower', ('~', '~'))[1], bounds.get('upper', ('', ''))[1])

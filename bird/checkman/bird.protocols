@@ -1,0 +1,52 @@
+title: State and statistics of BIRD protocols
+agents: linux
+catalog: app/bird
+license: GPL
+author: Frederik Kriewitz <frederik@kriewitz.eu>
+distribution: https://github.com/freddy36/check_mk_extensions
+description:
+ This check monitors the state, limits, route statistics, route change stats and
+ OSPF neighbor states of BIRD protocols.
+
+ This check needs the agent plugin {"bird"} to be installed.
+ 
+ To enable the "Time since last state change" graph/"since" perfdata,
+ it's required to add {"timeformat route iso long;"} to the bird config.
+
+ This check can go WARN or CRIT when the protocol state changes (up, down, ...),
+ when the protocol info is != Running (OSPF) or != Established (BGP),
+ when the number of neighbors changed (OSPF),
+ when a neighbor state is != full (OSPF),
+ when a BIRD route/import/receive/export limit is hit,
+ when a the number of imported/filtered/exported/preferred routes is outside of
+ a configurable range (See CHECK PARAMETERS for details).
+
+item:
+ The name of the protocol.
+
+inventory:
+ The inventory creates one service for each protocol.
+
+perfdata:
+ {"since"}: seconds since the last state change. Only available with {"timeformat route iso long;"} in the bird config.
+ 
+ {"route_stats_(filtered|imported|exported|preferred"}:
+    The number of routes falling in the corresponding class.
+        
+ {"route_change_stats_(Import|Export)_(updates|withdraws)_(received|rejected|filtered|ignored|accepted)"}:
+    The corresponding route change stats
+
+[parameters]
+parameters (dict): This check uses a dictionary as parameter. The dictionary can have
+                   the following keys:
+
+                   {"route_stats_levels"} - A dictionary defining WARN/CRIT levels for route statistics.
+                        Valid keys: {"imported"}, {"filtered"}, {"exported"}, {"preferred"}.
+                        The value is another dictionary with {"lower"} and/or {"upper"} as key and a pair of integers as WARN/CRIT levels.
+                        By default the upper imported/exported CRIT level is the import/export limit configured in your bird configuration.
+                        The corresponding default WARN level is computed using {"route_stats_levels_limit_warning_factor"} (see below).
+
+                   {"route_stats_levels_limit_warning_factor"} - A float value between 0 and 100 to be used for the calculation of the
+                        warning threshold as percentages of the critical threshold (configured route limits).
+                        The default is 90 (90% of the CRIT threshold).
+

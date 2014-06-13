@@ -7,6 +7,8 @@
                       'plugins/bird'
                      ],
            'checkman': [
+                        'bird.status',
+                        'bird6.status',
                         'bird.memory',
                         'bird6.memory',
                         'bird.protocols',

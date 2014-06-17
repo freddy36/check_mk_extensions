@@ -2,7 +2,7 @@
 # belongs into /var/check_mk/packages/
 {'author': 'Frederik Kriewitz <frederik@kriewitz.eu>',
  'description': 'Checks the status, memory and protocols of the BIRD Internet Routing Daemon.',
- 'download_url': 'https://github.com/freddy36/check_mk_extensions',
+ 'download_url': 'https://github.com/freddy36/check_mk_extensions/bird/',
  'files': {'agents': [
                       'plugins/bird'
                      ],

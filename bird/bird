@@ -1,7 +1,7 @@
 # ckeck_mk package definition file
 # belongs into /var/check_mk/packages/
 {'author': 'Frederik Kriewitz <frederik@kriewitz.eu>',
- 'description': 'Checks the status, memory and protocols of the BIRD Internet Routing Daemon',
+ 'description': 'Checks the status, memory and protocols of the BIRD Internet Routing Daemon.',
  'download_url': 'https://github.com/freddy36/check_mk_extensions',
  'files': {'agents': [
                       'plugins/bird'
@@ -38,6 +38,6 @@
                    ]},
  'name': 'bird',
  'title': 'BIRD Internet Routing Daemon Check',
- 'version': '0.1',
+ 'version': '1.0',
  'version.min_required': '1.2.0',
  'version.packaged': '1.2.4'}

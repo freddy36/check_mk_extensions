@@ -11,7 +11,7 @@ description:
  This check needs the agent plugin {"bird"} to be installed.
  
  To enable the "Time since last state change" graph/"since" perfdata,
- it's required to add {"timeformat route iso long;"} to the bird config.
+ it's required to add {"timeformat protocol iso long;"} to the bird config.
 
  This check can go WARN or CRIT when the protocol state changes (up, down, ...),
  when the protocol info is != Running (OSPF) or != Established (BGP),
@@ -28,7 +28,7 @@ inventory:
  The inventory creates one service for each protocol.
 
 perfdata:
- {"since"}: seconds since the last state change. Only available with {"timeformat route iso long;"} in the bird config.
+ {"since"}: seconds since the last state change. Only available with {"timeformat protocol iso long;"} in the bird config.
  
  {"route_stats_(filtered|imported|exported|preferred"}:
     The number of routes falling in the corresponding class.

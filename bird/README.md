@@ -32,7 +32,7 @@ service_dependencies = [
 ]
 ```
 
-To enable the "Time since last state change" graph for protocols, ``timeformat route iso long;`` must be added to your bird config.
+To enable the "Time since last state change" graph for protocols, ``timeformat protocol iso long;`` must be added to your bird config.
 
 Finaly just re-inventorize your hosts.
 

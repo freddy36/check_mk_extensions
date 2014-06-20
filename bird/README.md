@@ -13,7 +13,7 @@ See checkman pages for more details:
 * [bird.protocols](checkman/bird.protocols)
 
 ## Install
-Install the plugin on you check_mk server:
+Install the plugin on your check_mk servers:
 ```bash
 wget -O bird-1.0.mkp "http://exchange.check-mk.org/index.php?option=com_remository&Itemid=53&func=download&id=144&chk=6cee28d076a6ec9d6c6a9c065ac14f4f&no_html=1"
 [ "$(sha256sum bird-1.0.mkp)" == "ad7332515c3e6cb4dac659894095ba232c87ec816687bc2fdeb26605506e35cf  bird-1.0.mkp" ] && check_mk -vP install bird-1.0.mkp

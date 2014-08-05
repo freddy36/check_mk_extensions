@@ -27,11 +27,11 @@ do
 	BIRDC="birdc$VERSION"
 	which $BIRDC >/dev/null || continue # skip versions which aren't installed
 
-	echo "<<<bird$VERSION>>>"
 	STATUS=$(echo -n | $BIRDC -v show status 2>&1)
 	RESULT=$?
 	if [ $RESULT -eq 0 ]
 	then
+		echo "<<<bird$VERSION>>>"
 		echo "$STATUS" | awk "$MODIFIER"
 		echo -n | $BIRDC -v show memory | grep -v "^0001 " | awk "$MODIFIER"
 		PROTOCOLS_ALL=$(echo -n | $BIRDC -v show protocols all | grep -v "^0001 " | awk "$MODIFIER")
@@ -45,7 +45,5 @@ do
 
 		# dump modified time for config file(s)
 		ls -ln --time-style=+%s /etc/bird$VERSION\.* /etc/bird/bird$VERSION\.* 2>/dev/null | awk '{$1=$2=$3=$4=$5=""; sub(/^[ ]+ /, ""); print "10000 "$0}'
-	else
-		echo "9999 $STATUS"
 	fi
 done

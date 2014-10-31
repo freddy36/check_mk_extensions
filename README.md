@@ -11,5 +11,5 @@ Checks using the local feature of the agent
 
 * [dnssec.sh](local/dnssec.sh)
 
-  * A check to validate the DNSSEC trust chain using the dig +sigchase feature
+  * A check to validate the DNSSEC trust chain using drill
 

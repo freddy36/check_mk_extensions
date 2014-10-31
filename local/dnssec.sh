@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# A simple local check for check_mk to validate the DNSSEC trust chain using the dig +sigchase feature
+# A simple local check for check_mk to validate the DNSSEC trust chain using drill
 
 # Install instructions:
-# - Install dig:
-#   apt-get install dnsutils
-# - Generate the trusted-key file for dig:
-#   dig . dnskey | grep 257 > /etc/trusted-key.key
+# - Install drill:
+#   apt-get install ldnsutils
+# - Generate the trusted-key file for drill:
+#   drill DNSKEY . | grep "257 "> /etc/trusted-key.key
 # - Place this file in your agent's local check directory (/usr/lib/check_mk_agent/local)
 # - Adjust the ZONES array below
 
@@ -26,7 +26,9 @@
 # Copyright 2014 by Frederik Kriewitz <frederik@kriewitz.eu>.
 
 # array with zones to check
+#ZONES=("dnssec-failed.org")
 ZONES=()
+KEYFILE="/etc/trusted-key.key"
 
 # add any local bind signed zones
 for FILE in /var/cache/bind/*.zone.signed
@@ -39,18 +41,14 @@ done
 # check the zones
 for ZONE in ${ZONES[@]}
 do
-	CHASE=$(dig +topdown +sigchase $ZONE)
-	RESULT_TEXT=$(echo "$CHASE" | grep "^\;\;" | grep -Fv 'cleanandgo' | tail -n 1)
-	RESULT=$(echo "$RESULT_TEXT" | awk '{print $NF}')
-
-	if [ "$RESULT" == "SUCCESS" ];
-	then
-		STATUS=0
-	elif [ "$RESULT" == "FAILED" ];
+	CHASE=$(drill -k "$KEYFILE" -TD $ZONE)
+	RESULT_TEXT=$(echo "$CHASE" | awk '/^\[[^T]\]/' ORS=' ')
+	if [ -n "$RESULT_TEXT" ];
 	then
 		STATUS=2
 	else
-		STATUS=3
+		RESULT_TEXT=$(echo "$CHASE" | grep "^\[" | tail -n 1)
+		STATUS=0
 	fi
 
 	echo  "$STATUS dnssec_$ZONE - ${RESULT_TEXT/;; /}"

@@ -37,7 +37,12 @@ To enable the "Time since last state change" graph for protocols, ``timeformat p
 Finaly just re-inventorize your hosts.
 
 ## Changelog
+### Version 1.1
 
+ * Fix agent plugin for Debian wheezy
+ * Fix for clustered services
+ * Fix OSPF support for BIRD Version >= 1.5
+ 
 ### Version 1.0
 
  * initial release

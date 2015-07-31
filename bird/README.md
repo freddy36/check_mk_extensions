@@ -4,7 +4,7 @@ Checks the status, memory and protocols of the BIRD Internet Routing Daemon.
 
 BIRD and BIRD6 are supported.
 
-Also available as mkp package on check_mk Exchange: [bird-1.0.mkp](http://exchange.check-mk.org/index.php?option=com_remository&Itemid=59&func=fileinfo&id=144)
+Also available as mkp package on check_mk Exchange: [bird-1.1.mkp](https://mathias-kettner.de/check_mk_exchange_file.php?HTML=&file=bird-1.1.mkp)
 
 See checkman pages for more details:
 
@@ -15,8 +15,8 @@ See checkman pages for more details:
 ## Install
 Install the plugin on your check_mk servers:
 ```bash
-wget -O bird-1.0.mkp "http://exchange.check-mk.org/index.php?option=com_remository&Itemid=53&func=download&id=144&chk=6cee28d076a6ec9d6c6a9c065ac14f4f&no_html=1"
-[ "$(sha256sum bird-1.0.mkp)" == "ad7332515c3e6cb4dac659894095ba232c87ec816687bc2fdeb26605506e35cf  bird-1.0.mkp" ] && check_mk -vP install bird-1.0.mkp
+wget -O bird-1.0.mkp "https://mathias-kettner.de/check_mk_exchange_download.php?HTML=&file=bird-1.1.mkp"
+[ "$(sha256sum bird-1.1.mkp)" == "039e233e05f6a994dfa0a9af261b0d419b9972ca3e50d06457c6274f38656e13  bird-1.1.mkp" ] && check_mk -vP install bird-1.1.mkp
 ```
 
 Install the agent plugin on your bird servers:

@@ -15,7 +15,7 @@ See checkman pages for more details:
 ## Install
 Install the plugin on your check_mk servers:
 ```bash
-wget -O bird-1.0.mkp "https://mathias-kettner.de/check_mk_exchange_download.php?HTML=&file=bird-1.1.mkp"
+wget -O bird-1.1.mkp "https://mathias-kettner.de/check_mk_exchange_download.php?HTML=&file=bird-1.1.mkp"
 [ "$(sha256sum bird-1.1.mkp)" == "039e233e05f6a994dfa0a9af261b0d419b9972ca3e50d06457c6274f38656e13  bird-1.1.mkp" ] && check_mk -vP install bird-1.1.mkp
 ```
 

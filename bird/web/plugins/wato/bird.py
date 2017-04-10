@@ -126,6 +126,7 @@ for bird_version in [ "", "6" ]:
         "dict"
 )
 
+# Agent Bakery
 register_rule("agents/" + _("Agent Plugins"),
     "agent_config:bird",
     DropdownChoice(

@@ -404,13 +404,15 @@ def check_bird_protocols(item, params, info):
         crit = "%s:%s" % (bounds.get('lower', ('~', '~'))[1], bounds.get('upper', ('', ''))[1])
         perfdata.append(("route_stats_"+key, value, warn, crit))
 
+    this_time = int(time.time())
     for key, values in protocol.get('route_change_stats', {}).items():
         for field, value in sorted(values):
             if value == None:
                 continue
             
             perfkey = "route_change_stats_%s_%s" % (key, field)
-            perfdata.append((perfkey, str(value)+'c'))
+            rate = get_rate('bird_%s' % perfkey, this_time, value)
+            perfdata.append((perfkey, rate))
 
 
     if protocol['proto'] == "OSPF":

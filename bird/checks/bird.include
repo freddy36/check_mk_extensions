@@ -93,9 +93,6 @@
 # 10000 1399909638 /etc/bird/bird.conf.local
 
 
-import operator
-import datetime
-
 factory_settings["bird_status_default_levels"] = {
     "uptime_low_threshold": 300,
     "config_file_min_age": 60,
@@ -107,13 +104,13 @@ factory_settings["bird_protocols_default_levels"] = {
 
 def bird_strptime(string):
     # bird uses different time formats depending on the version/settings
+    import datetime
     for f in ['%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']:
         try:
             return datetime.datetime.strptime(string, f)
         except ValueError:
             pass
     raise ValueError("no timeformat matched %s" % (string))
-
 
 def bird_si_to_int(value, unit):
     _prefix = {'': 1, 'k': 1024, 'M': 1048576, 'G': 1073741824}
@@ -123,6 +120,7 @@ def bird_x_to_key(value):
     return "_".join(value).rstrip(':')
 
 def parse_bird(info):
+    import datetime
     data = {}
     last_protocol = None
     for line in info:
@@ -132,19 +130,23 @@ def parse_bird(info):
         if code == 1000:
             data['version'] = line[2]
         elif code == 1011:
+            if 'status' not in data:
+                data['status'] = {}
             status = data.setdefault('status', {})
             if line[1] == 'Router' and line[2] == 'ID':
                 status['router_id'] = line[4]
             elif line[1] == 'Current' and line[2] == 'server' and line[3] == 'time':
-                status['server_time'] = bird_strptime(" ".join(line[5:7]))
+                status['server_time'] = " ".join(line[5:7])
             elif line[1] == 'Last' and line[2] == 'reboot':
-                status['last_reboot'] = bird_strptime(" ".join(line[4:6]))
+                status['last_reboot'] = " ".join(line[4:6])
             elif line[1] == 'Last' and line[2] == 'reconfiguration':
-                status['last_reconfiguration'] = bird_strptime(" ".join(line[4:6]))
+                status['last_reconfiguration'] = " ".join(line[4:6])
         elif code == 24:
             graceful_restart_recovery_msgs = data['status'].setdefault('graceful_restart_recovery_msgs', [])
             graceful_restart_recovery_msgs.append(" ".join(line[1:]))
         elif code == 13:
+            if 'status' not in data:
+                data['status'] = {}
             data['status']['msg'] = " ".join(line[1:])
         elif code == 1018:
             if line[-1][-1] == 'B': # ignore lines which don't end vith B (not memory stats)
@@ -158,7 +160,7 @@ def parse_bird(info):
             last_protocol = protocols[line[1]] = {'proto': line[2], 'table': line[3], 'state': line[4]}
             try:
                 # try to get absolute time (works in case "timeformat protocol iso long;" is configured)
-                last_protocol['since'] = bird_strptime(" ".join(line[5:7]))
+                last_protocol['since'] = " ".join(line[5:7])
                 last_protocol['info'] = " ".join(line[7:])
             except ValueError:
                 last_protocol['since'] = line[5]
@@ -214,7 +216,7 @@ def parse_bird(info):
                     neighbour[field] = value
                 last_protocol['neighbours'].append(neighbour)
         elif code == 10000:
-            data.setdefault('config_files', []).append((" ".join(line[2:]), datetime.datetime.fromtimestamp(int(line[1]))))
+            data.setdefault('config_files', []).append((" ".join(line[2:]), int(line[1])))
 
     return data
 
@@ -229,6 +231,7 @@ def inventory_bird_status(info):
 
 def check_bird_status(item, params, info):
     # params is a snapshot of the parsed data at the point of time of inventory
+    import datetime
     data = parse_bird(info)
     if 'error' in data:
         return 3, "ERROR: "+data['error']
@@ -238,8 +241,8 @@ def check_bird_status(item, params, info):
     if 'msg' not in status:
         return 3, "No status message available"
 
-    uptime = status['server_time'] - status['last_reboot']
-    time_since_last_reconfiguration = status['server_time'] - status['last_reconfiguration']
+    uptime = bird_strptime(status['server_time']) - bird_strptime(status['last_reboot'])
+    time_since_last_reconfiguration = bird_strptime(status['server_time']) - bird_strptime(status['last_reconfiguration'])
     infotxts = []
     perfdata = [('uptime', uptime.total_seconds()), ('time_since_last_reconfiguration', time_since_last_reconfiguration.total_seconds())]
     state = 0
@@ -260,9 +263,10 @@ def check_bird_status(item, params, info):
             infotxts[-1] += "(!)"
             state = max(state, 1)
 
-        infotxts.append("last reconfiguration: %s" % (status['last_reconfiguration']))
-        for config_file, mtime in data.get('config_files', []):
-            if mtime > status['last_reconfiguration'] and (status['server_time'] - mtime) >= datetime.timedelta(seconds=params['config_file_min_age']):
+        infotxts.append("last reconfiguration: %s" % (bird_strptime(status['last_reconfiguration'])))
+        for config_file, mtimestamp in data.get('config_files', []):
+            mtime = datetime.datetime.fromtimestamp(mtimestamp)
+            if mtime > bird_strptime(status['last_reconfiguration']) and (bird_strptime(status['server_time']) - mtime) >= datetime.timedelta(seconds=params['config_file_min_age']):
                 infotxts.append("%s was modified since last reconfiguration(!)" % (config_file))
                 state = max(state, 1)
     else:
@@ -319,6 +323,9 @@ def inventory_bird_protocols(info):
 
 def check_bird_protocols(item, params, info):
     # params is a snapshot of the parsed data at the point of time of inventory
+    import operator
+    import datetime
+
     data = parse_bird(info)
     this_time = time.time()
     if 'error' in data:
@@ -351,11 +358,11 @@ def check_bird_protocols(item, params, info):
         state = 3;
         marker = ""
 
-    if type(protocol['since']) == datetime.datetime:
-        since_delta = data['status']['server_time'] - protocol['since']
+    try:
+        since_delta = bird_strptime(data['status']['server_time']) - bird_strptime(protocol['since'])
         since_str = str(since_delta)
         perfdata.append(('since', since_delta.total_seconds()))
-    else:
+    except ValueError:
         since_str = protocol['since']
     infotxt = "%s%s since %s" % (protocol['state'], marker, since_str)
     if protocol['info']:
@@ -403,13 +410,15 @@ def check_bird_protocols(item, params, info):
         crit = "%s:%s" % (bounds.get('lower', ('~', '~'))[1], bounds.get('upper', ('', ''))[1])
         perfdata.append(("route_stats_"+key, value, warn, crit))
 
+    this_time = int(time.time())
     for key, values in protocol.get('route_change_stats', {}).items():
         for field, value in sorted(values):
             if value == None:
                 continue
             
             perfkey = "route_change_stats_%s_%s" % (key, field)
-            perfdata.append((perfkey, str(value)+'c'))
+            rate = get_rate('bird_%s' % perfkey, this_time, value)
+            perfdata.append((perfkey, rate))
 
 
     if protocol['proto'] == "OSPF":

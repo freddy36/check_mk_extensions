@@ -27,7 +27,8 @@ check_info["bird.status"] = {
     'has_perfdata':             True,
     'service_description':      'BIRD Status',
     'default_levels_variable':  'bird_status_default_levels',
-    'group':                    'bird_status'
+    'group':                    'bird_status',
+    'includes':                 [ 'bird.include' ],
 }
 
 check_info["bird.memory"] = {
@@ -36,7 +37,8 @@ check_info["bird.memory"] = {
     'has_perfdata':             True,
     'service_description':      'BIRD Memory',
     'default_levels_variable':  'bird_memory_default_levels',
-    'group':                    'bird_memory'
+    'group':                    'bird_memory',
+    'includes':                 [ 'bird.include' ],
 }
 
 check_info["bird.protocols"] = {
@@ -45,6 +47,7 @@ check_info["bird.protocols"] = {
     'has_perfdata':             True,
     'service_description':      'BIRD Protocol %s',
     'default_levels_variable':  'bird_protocols_default_levels',
-    'group':                    'bird_protocols'
+    'group':                    'bird_protocols',
+    'includes':                 [ 'bird.include' ],
 }
 

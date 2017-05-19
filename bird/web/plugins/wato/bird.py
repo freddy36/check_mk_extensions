@@ -126,4 +126,16 @@ for bird_version in [ "", "6" ]:
         "dict"
 )
 
+# Agent Bakery
+register_rule("agents/" + _("Agent Plugins"),
+    "agent_config:bird",
+    DropdownChoice(
+        title = _("BIRD Internet Routing Daemon (Linux)"),
+        help = _("This will deploy the agent plugin <tt>bird</tt> for checking the BIRD Internet Routing Daemon."),
+        choices = [
+            ( True, _("Deploy plugin for BIRD") ),
+            ( None, _("Do not deploy plugin for BIRD") ),
+        ]
+    )
+)
 

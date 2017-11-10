@@ -434,7 +434,7 @@ def check_bird_protocols(item, params, info):
 
         for neighbour in protocol['neighbours']:
             neighbour_state = neighbour['State'].split("/")[0]
-            if neighbour_state.lower() != "full": # bird <=1.5 state is full, bird >= 1.5 state is Full (uppercase)
+            if neighbour_state.lower() not in ["full", "2-way"]: # bird <=1.5 state is full, bird >= 1.5 state is Full (uppercase)
                 infotxts.append("state of %s is %s(!)" % (neighbour['Router_IP'], neighbour_state))
                 state = max(state, 1)
 

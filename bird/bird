@@ -4,6 +4,7 @@
  'description': 'Checks the status, memory and protocols of the BIRD Internet Routing Daemon.',
  'download_url': 'https://github.com/freddy36/check_mk_extensions/tree/master/bird',
  'files': {'agents': [
+                      'bakery/bird',
                       'plugins/bird'
                      ],
            'checkman': [
@@ -35,9 +36,11 @@
            'web': [
                    'plugins/perfometer/bird.py',
                    'plugins/wato/bird.py',
+                   'plugins/metrics/bird.py'
                    ]},
  'name': 'bird',
+ 'num_files': 23,
  'title': 'BIRD Internet Routing Daemon Check',
- 'version': '1.1',
- 'version.min_required': '1.2.0',
- 'version.packaged': '1.2.4'}
+ 'version': '2.2',
+ 'version.min_required': '1.2.6',
+ 'version.packaged': '1.2.8p18'}

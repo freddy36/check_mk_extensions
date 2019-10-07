@@ -1,29 +1,15 @@
-# ckeck_mk package definition file
-# belongs into /var/check_mk/packages/
-{'author': 'Frederik Kriewitz <frederik@kriewitz.eu>',
- 'description': 'Checks the status, memory and protocols of the BIRD Internet Routing Daemon.',
+{'author': u'Frederik Kriewitz <frederik@kriewitz.eu>',
+ 'description': u'Checks the status, memory and protocols of the BIRD Internet Routing Daemon.\n',
  'download_url': 'https://github.com/freddy36/check_mk_extensions/tree/master/bird',
- 'files': {'agents': [
-                      'bakery/bird',
-                      'plugins/bird'
-                     ],
-           'checkman': [
-                        'bird.status',
+ 'files': {'agents': ['plugins/bird', 'bakery/bird'],
+           'checkman': ['bird.status',
                         'bird6.status',
                         'bird.memory',
                         'bird6.memory',
                         'bird.protocols',
-                        'bird6.protocols',
-                       ],
-           'checks': [
-                      'bird.include',
-                      'bird6',
-                      'bird',
-                      ],
-           'doc': [
-                  ],
-           'pnp-templates': [
-                             'check_mk-bird.status.include.php',
+                        'bird6.protocols'],
+           'checks': ['bird.include', 'bird6', 'bird'],
+           'pnp-templates': ['check_mk-bird.status.include.php',
                              'check_mk-bird.status.php',
                              'check_mk-bird6.status.php',
                              'check_mk-bird.memory.include.php',
@@ -31,16 +17,13 @@
                              'check_mk-bird6.memory.php',
                              'check_mk-bird.protocols.include.php',
                              'check_mk-bird.protocols.php',
-                             'check_mk-bird6.protocols.php',
-                             ],
-           'web': [
-                   'plugins/perfometer/bird.py',
+                             'check_mk-bird6.protocols.php'],
+           'web': ['plugins/perfometer/bird.py',
                    'plugins/wato/bird.py',
-                   'plugins/metrics/bird.py'
-                   ]},
+                   'plugins/metrics/bird.py']},
  'name': 'bird',
  'num_files': 23,
- 'title': 'BIRD Internet Routing Daemon Check',
- 'version': '2.2',
- 'version.min_required': '1.2.6',
- 'version.packaged': '1.2.8p18'}
+ 'title': u'BIRD Internet Routing Daemon Check',
+ 'version': '3.0',
+ 'version.min_required': '1.6.0',
+ 'version.packaged': '1.6.0p3'}

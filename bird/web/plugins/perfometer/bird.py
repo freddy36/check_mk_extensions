@@ -22,6 +22,7 @@ perfometers["check_mk-bird.status"]      = perfometer_check_mk_uptime
 perfometers["check_mk-bird6.status"]     = perfometer_check_mk_uptime
 
 def perfometer_check_mk_bird_protocols(row, check_command, perf_data):
+    from cmk.gui.utils import saveint
     value = saveint(filter(lambda x: x[0] == "route_stats_imported", perf_data)[0][1])
     return "%d imported" % value, perfometer_logarithmic(value, 20000 , 2 , "#da6")
 
@@ -29,6 +30,7 @@ perfometers["check_mk-bird.protocols"]   = perfometer_check_mk_bird_protocols
 perfometers["check_mk-bird6.protocols"]  = perfometer_check_mk_bird_protocols
 
 def perfometer_check_mk_bird_memory(row, check_command, perf_data):
+    from cmk.gui.utils import saveint
     value = saveint(filter(lambda x: x[0] == "Total", perf_data)[0][1])
     value_mb = value/1024/1024
     return "%d MB" % value_mb, perfometer_logarithmic(value_mb, 500 , 2 , "#80ff40")

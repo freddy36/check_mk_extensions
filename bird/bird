@@ -24,6 +24,6 @@
  'name': 'bird',
  'num_files': 23,
  'title': u'BIRD Internet Routing Daemon Check',
- 'version': '3.0',
+ 'version': '3.1',
  'version.min_required': '1.6.0',
- 'version.packaged': '1.6.0p3'}
+ 'version.packaged': '1.6.0p5'}

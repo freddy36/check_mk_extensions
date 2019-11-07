@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- encoding: utf-8; py-indent-offset: 4 -*-
 
 def bake_bird(opsys, conf, conf_dir, plugins_dir):
     if conf:
-        shutil.copy2(local_agents_dir + "/plugins/bird", plugins_dir + "/bird")
+        shutil.copy2(cmk.utils.paths.local_agents_dir + "/plugins/bird", plugins_dir + "/bird")
 
 bakery_info["bird"] = {
     "bake_function" : bake_bird,

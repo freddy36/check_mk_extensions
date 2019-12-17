@@ -18,6 +18,8 @@
 #
 # Copyright 2014 by Frederik Kriewitz <frederik@kriewitz.eu>.
 
+from cmk.gui.plugins.views.perfometers.check_mk import perfometer_check_mk_uptime
+
 perfometers["check_mk-bird.status"]      = perfometer_check_mk_uptime
 perfometers["check_mk-bird6.status"]     = perfometer_check_mk_uptime
 

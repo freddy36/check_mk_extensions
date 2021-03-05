@@ -1,1 +1,40 @@
-bird.status
+title: BIRD status
+agents: linux
+catalog: app/bird
+license: GPL
+author: Frederik Kriewitz <frederik@kriewitz.eu>
+distribution: https://github.com/freddy36/check_mk_extensions
+description:
+ This check monitors the overall state of BIRD.
+
+ This check needs the agent plugin {"bird"} to be installed.
+ 
+ This check can go WARN or CRIT when BIRD is not running (CRIT),
+ when BIRD is shutting down (CRIT),
+ when reconfiguration is in progress (WARN),
+ when BIRD is in graceful restart recovery mode (WARN),
+ when the uptime of the daemon is below a configurable threshold (WARN),
+ when a configuration file has been modified since the last reconfiguration (WARN).
+ 
+ For the last reconfiguration warning the modification time of the following files is relevant:
+ {/etc/bird(|6).*}
+ {/etc/bird/bird(|6).*}
+
+inventory:
+ The inventory automatically creates a service.
+
+perfdata:
+ {"uptime"}: Uptime of the process in seconds.
+ 
+ {"time_since_last_reconfiguration"}: Time since last reconfiguration in seconds.
+
+[parameters]
+parameters (dict): This check uses a dictionary as parameter. The dictionary can have
+                   the following keys:
+
+                   {"uptime_low_threshold"} - An integer (seconds) specifying the threshold for the low uptime warning.
+                        The default is 300 seconds.
+
+                   {"config_file_min_age"} - An integer (seconds) specifying the minimum age of a config file required to trigger a last reconfiguration warning.
+                        The default is 60 seconds.
+

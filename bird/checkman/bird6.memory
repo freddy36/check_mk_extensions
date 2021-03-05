@@ -1,1 +1,34 @@
-bird.memory
+title: BIRD memory pool usage
+agents: linux
+catalog: app/bird
+license: GPL
+author: Frederik Kriewitz <frederik@kriewitz.eu>
+distribution: https://github.com/freddy36/check_mk_extensions
+description:
+ This check monitors the memory usage of the BIRD memory pools.
+
+ This check needs the agent plugin {"bird"} to be installed.
+ 
+ This check can go WARN or CRIT when the total memory usage exceeds a configurable limit.
+
+inventory:
+ The inventory automatically creates a service.
+
+perfdata:
+ {"Routing_tables"}: Routing tables memory usage in bytes.
+ 
+ {"Route_attributes"}: Routing attributes memory usage in bytes.
+ 
+ {"ROA_tables"}: ROA tables memory usage in bytes.
+ 
+ {"Protocols"}: Protocols memory usage in bytes.
+ 
+ {"Total"}: Total memory usage in bytes.
+
+[parameters]
+parameters (dict): This check uses a dictionary as parameter. The dictionary can have
+                   the following keys:
+
+                   {"memory_levels_(Routing_tables|Route_attributes|ROA_tables|Protocols|Total"} - A pair of integers (MBytes) used as WARN/CRIT levels.
+                        By default there's no limit.
+

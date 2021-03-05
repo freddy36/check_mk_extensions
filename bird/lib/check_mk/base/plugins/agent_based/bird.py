@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- encoding: utf-8; py-indent-offset: 4 -*-
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 #
@@ -18,6 +18,8 @@
 # along with it. If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright 2014 by Frederik Kriewitz <frederik@kriewitz.eu>.
+#
+# ported to CMK 2.0 2021 by Robert Sander <r.sander@heinlein-support.de>
 
 # Example data from agent:
 # <<<bird>>>
@@ -92,19 +94,40 @@
 # 10000 1401204399 /etc/bird/bird.conf.common
 # 10000 1399909638 /etc/bird/bird.conf.local
 
+from .agent_based_api.v1.type_defs import (
+    CheckResult,
+    DiscoveryResult,
+)
 
-factory_settings["bird_status_default_levels"] = {
+from .agent_based_api.v1 import (
+    check_levels,
+    get_rate,
+    get_value_store,
+    register,
+    render,
+    Result,
+    Metric,
+    State,
+    Service,
+    )
+
+import time
+import datetime
+
+from cmk.utils import debug
+from pprint import pprint
+
+_bird_status_default_levels = {
     "uptime_low_threshold": 300,
     "config_file_min_age": 60,
 }
 
-factory_settings["bird_protocols_default_levels"] = {
+_bird_protocols_default_levels = {
     "route_stats_levels_limit_warning_factor": 90.0,
 }
 
-def bird_strptime(string):
+def _bird_strptime(string):
     # bird uses different time formats depending on the version/settings
-    import datetime
     for f in ['%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']:
         try:
             return datetime.datetime.strptime(string, f)
@@ -112,27 +135,26 @@ def bird_strptime(string):
             pass
     raise ValueError("no timeformat matched %s" % (string))
 
-def bird_si_to_int(value, unit):
+def _bird_si_to_int(value, unit):
     _prefix = {'': 1, 'k': 1024, 'M': 1048576, 'G': 1073741824}
     return int(value) * _prefix[unit.rstrip('B')]
 
-def bird_x_to_key(value):
+def _bird_x_to_key(value):
     return "_".join(value).rstrip(':')
 
-def parse_bird(info):
-    import datetime
-    data = {}
+def parse_bird(string_table):
+    section = {}
     last_protocol = None
-    for line in info:
+    for line in string_table:
         code = int(line[0])
         if 8000 <= code <= 9999:
-            data['error'] = " ".join(line[1:])
+            section['error'] = " ".join(line[1:])
         if code == 1000:
-            data['version'] = line[2]
+            section['version'] = line[2]
         elif code == 1011:
-            if 'status' not in data:
-                data['status'] = {}
-            status = data.setdefault('status', {})
+            if 'status' not in section:
+                section['status'] = {}
+            status = section.setdefault('status', {})
             if line[1] == 'Router' and line[2] == 'ID':
                 status['router_id'] = line[4]
             elif line[1] == 'Current' and line[2] == 'server' and line[3] == 'time':
@@ -142,21 +164,21 @@ def parse_bird(info):
             elif line[1] == 'Last' and line[2] == 'reconfiguration':
                 status['last_reconfiguration'] = " ".join(line[4:6])
         elif code == 24:
-            graceful_restart_recovery_msgs = data['status'].setdefault('graceful_restart_recovery_msgs', [])
+            graceful_restart_recovery_msgs = section['status'].setdefault('graceful_restart_recovery_msgs', [])
             graceful_restart_recovery_msgs.append(" ".join(line[1:]))
         elif code == 13:
-            if 'status' not in data:
-                data['status'] = {}
-            data['status']['msg'] = " ".join(line[1:])
+            if 'status' not in section:
+                section['status'] = {}
+            section['status']['msg'] = " ".join(line[1:])
         elif code == 1018:
             if line[-1][-1] == 'B': # ignore lines which don't end vith B (not memory stats)
-                memory = data.setdefault('memory', [])
+                memory = section.setdefault('memory', [])
                 name = " ".join(line[1:-2]).rstrip(":")
                 value_text = " ".join(line[-2:])
-                value_bytes = bird_si_to_int(line[-2], line[-1])
+                value_bytes = _bird_si_to_int(line[-2], line[-1])
                 memory.append((name, value_text, value_bytes))
         elif code == 1002:
-            protocols = data.setdefault('protocols', {})
+            protocols = section.setdefault('protocols', {})
             last_protocol = protocols[line[1]] = {'proto': line[2], 'table': line[3], 'state': line[4]}
             try:
                 # try to get absolute time (works in case "timeformat protocol iso long;" is configured)
@@ -173,7 +195,7 @@ def parse_bird(info):
             if line[1] == "Preference:":
                 last_protocol['preference'] = line[2]
             elif line[2] == "filter:":
-                key = bird_x_to_key(line[1:3])
+                key = _bird_x_to_key(line[1:3])
                 last_protocol[key] = " ".join(line[3:])
             elif line[2] == "limit:" and line[1] != 'Route':
                 limits = last_protocol.setdefault('limits', {})
@@ -192,19 +214,19 @@ def parse_bird(info):
                 last_limit['action'] = "restart"
             elif line[1] == "Routes:":
                 route_stats = last_protocol['route_stats'] = {}
-                for i in xrange(2,len(line),2):
+                for i in range(2,len(line),2):
                     route_stats[line[i+1].rstrip(",")] = int(line[i])
             elif line[1] == "Route" and line[2] == "change" and line[3] == "stats:":
                 route_change_stats_fields = line[4:]
                 route_change_stats = last_protocol['route_change_stats'] = {}
             elif line[1] in ('Import', 'Export') and line[2] in ('updates:', 'withdraws:'):
-                key = bird_x_to_key(line[1:3])
+                key = _bird_x_to_key(line[1:3])
                 route_change_stats[key] = []
                 for field, value in zip(route_change_stats_fields, line[3:]):
                     if value == "---":
                         value = None
                     else:
-                        value = saveint(value)
+                        value = int(value)
                     route_change_stats[key].append((field, value))
         elif code == 1013:
             if line[1][-1] == ":":
@@ -216,165 +238,153 @@ def parse_bird(info):
                     neighbour[field] = value
                 last_protocol['neighbours'].append(neighbour)
         elif code == 10000:
-            data.setdefault('config_files', []).append((" ".join(line[2:]), int(line[1])))
+            section.setdefault('config_files', []).append((" ".join(line[2:]), int(line[1])))
 
-    return data
+    return section
 
-def inventory_bird_status(info):
-    data = parse_bird(info)
-    inventory = []
-    if 'status' in data: # bird is running
-        inventory.append((None, data))
+register.agent_section(
+    name="bird",
+    parse_function=parse_bird,
+)
 
-    return inventory
+register.agent_section(
+    name="bird6",
+    parse_function=parse_bird,
+)
 
+def discover_bird_status(section) -> DiscoveryResult:
+    if 'status' in section: # bird is running
+        yield Service(parameters=section)
 
-def check_bird_status(item, params, info):
+def check_bird_status(params, section) -> CheckResult:
     # params is a snapshot of the parsed data at the point of time of inventory
-    import datetime
-    data = parse_bird(info)
-    if 'error' in data:
-        return 3, "ERROR: "+data['error']
-    if 'status' not in data:
-        return 3, "No status information available"
-    status = data['status']
+    if 'error' in section:
+        yield Result(state=State.CRIT,
+                     summary="ERROR: "+section['error'])
+        return
+    if 'status' not in section:
+        yield Result(state=State.UNKNOWN,
+                     summary="No status information available")
+        return
+    status = section['status']
     if 'msg' not in status:
-        return 3, "No status message available"
+        yield Result(state=State.UNKNOWN,
+                     summary="No status message available")
+        return
 
-    uptime = bird_strptime(status['server_time']) - bird_strptime(status['last_reboot'])
-    time_since_last_reconfiguration = bird_strptime(status['server_time']) - bird_strptime(status['last_reconfiguration'])
-    infotxts = []
-    perfdata = [('uptime', uptime.total_seconds()), ('time_since_last_reconfiguration', time_since_last_reconfiguration.total_seconds())]
-    state = 0
-    infotxts.append("version %s" % (data['version']))
+    uptime = _bird_strptime(status['server_time']) - _bird_strptime(status['last_reboot'])
+    time_since_last_reconfiguration = _bird_strptime(status['server_time']) - _bird_strptime(status['last_reconfiguration'])
+    yield Metric('uptime', uptime.total_seconds())
+    yield Metric('time_since_last_reconfiguration', time_since_last_reconfiguration.total_seconds())
+    yield Result(state=State.OK,
+                 summary="version %s" % section['version'])
     if status['msg'] == "Shutdown in progress":
-        infotxts.append(status['msg']+"(!!)")
-        state = max(state, 2)
+        yield Result(state=State.CRIT,
+                     summary=status['msg'])
     elif 'graceful_restart_recovery_msgs' in status:
-        infotxts += status['graceful_restart_recovery_msgs']
-        infotxts[-len(status['graceful_restart_recovery_msgs'])] += "(!)"
-        state = max(state, 1)
+        yield Result(state=State.WARN,
+                     summary=status['graceful_restart_recovery_msgs'])
     elif status['msg'] == "Reconfiguration in progress":
-        infotxts.append(status['msg']+"(!)")
-        state = max(state, 1)
+        yield Result(state=State.WARN,
+                     summary=status['msg'])
     elif status['msg'] == "Daemon is up and running":
-        infotxts.append("up since %s" % (str(uptime).replace(",", " and")))
+        state = State.OK
         if uptime < datetime.timedelta(seconds=params['uptime_low_threshold']):
-            infotxts[-1] += "(!)"
-            state = max(state, 1)
-
-        infotxts.append("last reconfiguration: %s" % (bird_strptime(status['last_reconfiguration'])))
-        for config_file, mtimestamp in data.get('config_files', []):
+            state = State.WARN
+        yield Result(state=state,
+                     summary="up since %s" % (str(uptime).replace(",", " and")))
+        yield Result(state=State.OK,
+                     summary="last reconfiguration: %s" % _bird_strptime(status['last_reconfiguration']))
+        for config_file, mtimestamp in section.get('config_files', []):
             mtime = datetime.datetime.fromtimestamp(mtimestamp)
-            if mtime > bird_strptime(status['last_reconfiguration']) and (bird_strptime(status['server_time']) - mtime) >= datetime.timedelta(seconds=params['config_file_min_age']):
-                infotxts.append("%s was modified since last reconfiguration(!)" % (config_file))
-                state = max(state, 1)
+            if mtime > _bird_strptime(status['last_reconfiguration']) and (_bird_strptime(status['server_time']) - mtime) >= datetime.timedelta(seconds=params['config_file_min_age']):
+                yield Result(state=State.WARN,
+                             summary="%s was modified since last reconfiguration" % config_file)
     else:
-        infotxts.append("Unknown status: %s" % (status['msg']))
-        state = max(state, 4)
+        yield Result(state=State.UNKNOWN,
+                     summary="Unknown status: %s" % status['msg'])
 
-    return state, ", ".join(infotxts), perfdata
+def discover_bird_memory(section) -> DiscoveryResult:
+    if 'memory' in section: # bird is running
+        yield Service(parameters=section)
 
-
-def inventory_bird_memory(info):
-    data = parse_bird(info)
-    inventory = []
-    if 'memory' in data: # bird is running
-        inventory.append((None, data))
-
-    return inventory
-
-def check_bird_memory(item, params, info):
+def check_bird_memory(params, section) -> CheckResult:
     # params is a snapshot of the parsed data at the point of time of inventory
-    data = parse_bird(info)
-    if 'error' in data:
-        return 3, "ERROR: "+data['error']
-    if 'memory' not in data:
-        return 3, "No memory data available"
-    memory = data['memory']
-    perfdata = []
-    infotxts = []
-    state = 0
-    for name, value_text, value_bytes in memory:
+    if 'error' in section:
+        yield Result(state=State.CRIT,
+                     summary="ERROR: "+section['error'])
+        return
+    if 'memory' not in section:
+        yield Result(state=State.UNKNOWN,
+                     summary="No memory data available")
+        return
+    for name, value_text, value_bytes in section['memory']:
         key = name.replace(" ", "_")
-        value_mb = value_bytes/1048576
-        marker = ""
-        warn_bytes = crit_bytes = None
         warn, crit = params.get('memory_levels_'+key, (None, None))
-        for limit, new_state in [(crit, 2), (warn, 1)]:
-            if limit != None and value_mb > limit:
-                marker = " above limit %i MB(%s)" % (limit, "!"*new_state)
-                state = max(state, new_state)
-                break
+        yield from check_levels(value_bytes,
+                                levels_upper=(warn, crit),
+                                metric_name=key,
+                                render_func=render.bytes,
+                                label=name)
 
-        infotxts.append("%s: %s%s" % (name, value_text, marker))
-        perfdata.append((key, value_bytes, warn*1048576 if warn != None else None, crit*1048576 if crit != None else None))
+def discover_bird_protocols(section) -> DiscoveryResult:
+    if debug.enabled():
+        pprint(section)
+    for protocol in section.get('protocols', {}):
+        yield Service(item=protocol, parameters=section)
 
-    return state, ", ".join(infotxts), perfdata
-
-def inventory_bird_protocols(info):
-    data = parse_bird(info)
-    inventory = []
-    if 'protocols' in data: # bird is running
-        for protocol in data['protocols']:
-            inventory.append((protocol, data))
-
-    return inventory
-
-def check_bird_protocols(item, params, info):
+def check_bird_protocols(item, params, section) -> CheckResult:
     # params is a snapshot of the parsed data at the point of time of inventory
-    import operator
-    import datetime
 
-    data = parse_bird(info)
     this_time = time.time()
-    if 'error' in data:
-        return 3, "ERROR: "+data['error']
-    if 'protocols' not in data:
-        return 3, "No protocol information available"
-    if item not in data['protocols']:
-        return 3, "The protocol no longer exists"
-    protocol = data['protocols'][item]
-    protocol_inventory = params.setdefault('protocols', {}).get(item)
+    if 'error' in section:
+        yield Result(state=State.CRIT,
+                     summary="ERROR: "+section['error'])
+        return
+    if 'protocols' not in section:
+        yield Result(state=State.UNKNOWN,
+                     summary="No protocol information available")
+        return
+    if item not in section.get('protocols', {}):
+        yield Result(state=State.UNKNOWN,
+                     summary="The protocol no longer exists")
+        return
+    protocol = section['protocols'][item]
+    protocol_inventory = params.get('protocols', {}).get(item)
     if protocol_inventory == None:
-        return 3, "inventory data is missing"
-
-    perfdata = []
-    infotxts = []
+        yield Result(state=State.UNKNOWN,
+                     summary="inventory data is missing")
+        return
 
     if 'description' in protocol:
-        infotxts.append(protocol['description'])
+        yield Result(state=State.OK,
+                     summary=protocol['description'])
 
     if protocol['state'] in ["up"] or protocol['state'] == protocol_inventory['state']:
-        state = 0;
-        marker = ""
+        state = State.OK
     elif protocol['state'] in ["start", "wait", "feed"]:
-        state = 1;
-        marker = "(!)"
+        state = State.WARN
     elif protocol['state'] in ["stop", "flush", "down"]:
-        state = 2;
-        marker = "(!!)"
+        state = State.CRIT
     else:
-        state = 3;
-        marker = ""
+        state = State.UNKNOWN
 
     try:
-        since_delta = bird_strptime(data['status']['server_time']) - bird_strptime(protocol['since'])
+        since_delta = _bird_strptime(section['status']['server_time']) - _bird_strptime(protocol['since'])
         since_str = str(since_delta)
-        perfdata.append(('since', since_delta.total_seconds()))
+        yield Metric('since', since_delta.total_seconds())
     except ValueError:
         since_str = protocol['since']
-    infotxt = "%s%s since %s" % (protocol['state'], marker, since_str)
+    yield Result(state=state,
+                 summary="%s since %s" % (protocol['state'], since_str))
     if protocol['info']:
-        marker = ""
+        state = State.OK
         if protocol['proto'] == "OSPF" and protocol['info'] != "Running" and protocol['info'] != protocol_inventory['info']:
-            marker = "(!)"
-            state = max(state, 1)
+            state = State.WARN
         elif protocol['proto'] == "BGP" and protocol['info'] != "Established" and protocol['info'] != protocol_inventory['info']:
-            marker = "(!)"
-            state = max(state, 1)
-        infotxt += " (%s%s)" % (protocol['info'], marker)
-    infotxts.append(infotxt)
+            state = State.WARN
+        yield Result(state=state,
+                     summary=protocol['info'])
 
     limit_bounds = {}
     for limit_name, limit in protocol.get('limits', {}).items():
@@ -383,61 +393,110 @@ def check_bird_protocols(item, params, info):
         warn = int(params['route_stats_levels_limit_warning_factor']/100.0 * crit)
         limit_bounds[route_stats_levels_key] = { 'upper': (warn, crit) }
         if limit['hit']:
+            state = State.CRIT
             if limit['action'] == "warn":
-                state = max(state, 1)
-                marker = "(!)"
-            else:
-                state = max(state, 2)
-                marker = "(!!)"
-            infotxts.append("%s limit (%d) hit%s" % (limit_name, limit['value'], marker))
+                state = State.WARN
+            yield Result(state=state,
+                         summary="%s limit (%d) hit" % (limit_name, limit['value']))
 
     route_stats_levels = params.get('route_stats_levels', {})
     for key, value in protocol.get('route_stats', {}).items():
-        infotxt = "%i %s" % (value, key)
         bounds = limit_bounds.get(key, {})
         if key in route_stats_levels:
             bounds.update(route_stats_levels[key])
-        for bound, operation, txt in [("lower", operator.le, "is below"), ("upper", operator.ge, "is above")]:
-            if bound in bounds:
-                 warn, crit = bounds[bound]
-                 for level, marker, error_state in [(crit, "!!", 2), (warn, "!", 1)]:
-                     if operation(value, level):
-                         infotxt += " %s %i (%s)" % (txt, level, marker)
-                         state = max(state, error_state)
-                         break
-        infotxts.append(infotxt)
-        warn = "%s:%s" % (bounds.get('lower', ('~', '~'))[0], bounds.get('upper', ('', ''))[0])
-        crit = "%s:%s" % (bounds.get('lower', ('~', '~'))[1], bounds.get('upper', ('', ''))[1])
-        perfdata.append(("route_stats_"+key, value, warn, crit))
+        yield from check_levels(value,
+                                levels_upper=bounds.get('upper', (None, None)),
+                                levels_lower=bounds.get('lower', (None, None)),
+                                metric_name="route_stats_"+key,
+                                label=key,
+                                notice_only=True)
 
-    this_time = int(time.time())
+    this_time = time.time()
+    value_store = get_value_store()
     for key, values in protocol.get('route_change_stats', {}).items():
         for field, value in sorted(values):
             if value == None:
                 continue
-            
-            perfkey = "route_change_stats_%s_%s" % (key, field)
-            rate = get_rate('bird_%s' % perfkey, this_time, value)
-            perfdata.append((perfkey, rate))
 
+            perfkey = "route_change_stats_%s_%s" % (key, field)
+            rate = get_rate(value_store, 'bird_%s' % perfkey, this_time, value)
+            yield Metric(perfkey, rate)
 
     if protocol['proto'] == "OSPF":
         neighbours_count = len(protocol['neighbours'])
         neighbours_inventory_count = len(protocol_inventory['neighbours'])
-        perfdata.append(("neighbours", neighbours_count, None, None, None, None))
+        yield Metric("neighbours", neighbours_count)
 
         infotxt = "%i neighbours" % (neighbours_count)
+        state = State.OK
         if neighbours_count != neighbours_inventory_count:
-            infotxt += "(!) (was %i during inventory)" % (neighbours_inventory_count)
-            state = max(state, 1)
-        infotxts.append(infotxt)
+            infotxt += " (was %i during inventory)" % (neighbours_inventory_count)
+            state = State.WARN
+        yield Result(state=state,
+                     notice=infotxt)
 
         for neighbour in protocol['neighbours']:
             neighbour_state = neighbour['State'].split("/")[0]
             if neighbour_state.lower() not in ["full", "2-way"]: # bird <=1.5 state is full, bird >= 1.5 state is Full (uppercase)
-                infotxts.append("state of %s is %s(!)" % (neighbour['Router_IP'], neighbour_state))
-                state = max(state, 1)
+                yield Result(state=State.WARN,
+                             summary="state of %s is %s" % (neighbour['Router_IP'], neighbour_state))
 
+register.check_plugin(
+    name="bird_status",
+    service_name="BIRD Status",
+    sections=["bird"],
+    discovery_function=discover_bird_status,
+    check_function=check_bird_status,
+    check_default_parameters=_bird_status_default_levels,
+    check_ruleset_name="bird_status",
+)
 
-    return state, ", ".join(infotxts), perfdata
+register.check_plugin(
+    name="bird6_status",
+    service_name="BIRD6 Status",
+    sections=["bird"],
+    discovery_function=discover_bird_status,
+    check_function=check_bird_status,
+    check_default_parameters=_bird_status_default_levels,
+    check_ruleset_name="bird_status",
+)
 
+register.check_plugin(
+    name="bird_memory",
+    service_name="BIRD Memory",
+    sections=["bird"],
+    discovery_function=discover_bird_memory,
+    check_function=check_bird_memory,
+    check_default_parameters={},
+    check_ruleset_name="bird_memory",
+)
+
+register.check_plugin(
+    name="bird6_memory",
+    service_name="BIRD6 Memory",
+    sections=["bird"],
+    discovery_function=discover_bird_memory,
+    check_function=check_bird_memory,
+    check_default_parameters={},
+    check_ruleset_name="bird6_memory",
+)
+
+register.check_plugin(
+    name="bird_protocols",
+    service_name="BIRD Protocol %s",
+    sections=["bird"],
+    discovery_function=discover_bird_protocols,
+    check_function=check_bird_protocols,
+    check_default_parameters=_bird_protocols_default_levels,
+    check_ruleset_name="bird_protocols",
+)
+
+register.check_plugin(
+    name="bird6_protocols",
+    service_name="BIRD6 Protocol %s",
+    sections=["bird"],
+    discovery_function=discover_bird_protocols,
+    check_function=check_bird_protocols,
+    check_default_parameters=_bird_protocols_default_levels,
+    check_ruleset_name="bird6_protocols",
+)

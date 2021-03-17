@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- encoding: utf-8; py-indent-offset: 4 -*-
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 
@@ -18,12 +19,24 @@
 #
 # Copyright 2014 by Frederik Kriewitz <frederik@kriewitz.eu>.
 
+from cmk.gui.i18n import _
+from cmk.gui.valuespec import (
+    Dictionary,
+    Integer,
+    Filesize,
+    Tuple,
+)
+
+from cmk.gui.plugins.wato import (
+    rulespec_registry,
+    CheckParameterRulespecWithoutItem,
+    CheckParameterRulespecWithItem,
+    RulespecGroupCheckParametersApplications,
+)
+
 # bird.status
-register_check_parameters(
-    subgroup_applications,
-    "bird_status",
-    _("BIRD Status"),
-    Dictionary(
+def _parameter_valuespec_bird_status():
+    return Dictionary(
         elements = [
             ("uptime_low_threshold",
                 Integer(
@@ -40,102 +53,99 @@ register_check_parameters(
                 ),
             ),
 	]
-    ),
-    None,
-    "dict"
-)
+    )
+
+rulespec_registry.register(
+    CheckParameterRulespecWithoutItem(
+        check_group_name="bird_status",
+        group=RulespecGroupCheckParametersApplications,
+        match_type="dict",
+        parameter_valuespec=_parameter_valuespec_bird_status,
+        title=lambda: _("BIRD Status"),
+    ))
+
 
 # bird.memory
-bird_memory_valuespec = Dictionary(
-    elements = [
-        ( "memory_levels_Total",
-            Tuple(
-                title = _("Total memory usage"),
-                elements = [
-                    Integer(title = _("Warning if above"), unit = _("MB")),
-                    Integer(title = _("Critical if above"), unit = _("MB")),
-                ]
-            ),
-        )
-    ]
-)
+def _parameter_valuespec_bird_memory():
+    return Dictionary(
+        elements = [
+            ( "memory_levels_Total",
+              Tuple(
+                  title = _("Total memory usage"),
+                  elements = [
+                      Filesize(title = _("Warning if above")),
+                      Filesize(title = _("Critical if above")),
+                  ]
+              ),
+            )
+        ]
+    )
 
 # bird.protocols
-bird_protocols_valuespec = Dictionary(
-    elements = [
-        ( "route_stats_levels",
-            Dictionary(
-                title = _("Route Statistics Levels"),
-                elements = [
-                    (i, Dictionary(
-                        title = _(i),
-                        elements = [
-                            ("lower",
-                                Tuple(
-                                    help = _("Lower levels for the %s routes") % (i),
-                                    title = _("Lower levels"),
-                                    elements = [
-                                        Integer(title = _("warning if below")),
-                                        Integer(title = _("critical if below")),
-                                    ]
+def _parameter_valuespec_bird_protocols():
+    return Dictionary(
+        elements = [
+            ( "route_stats_levels",
+                Dictionary(
+                    title = _("Route Statistics Levels"),
+                    elements = [
+                        (i, Dictionary(
+                            title = _(i),
+                            elements = [
+                                ("lower",
+                                    Tuple(
+                                        help = _("Lower levels for the %s routes") % (i),
+                                        title = _("Lower levels"),
+                                        elements = [
+                                            Integer(title = _("warning if below")),
+                                            Integer(title = _("critical if below")),
+                                        ]
+                                    ),
                                 ),
-                            ),
-                            ( "upper",
-                                Tuple(
-                                    help = _("Upper levels for the %s routes") % (i),
-                                    title = _("Upper levels"),
-                                    elements = [
-                                        Integer(title = _("warning if above")),
-                                        Integer(title = _("critical if above")),
-                                    ]),
-                            ),
-                        ],
-                        optional_keys = ["upper", "lower"],
-                    )) for i in ["imported", "filtered", "exported", "preferred"]
-            	]
+                                ( "upper",
+                                    Tuple(
+                                        help = _("Upper levels for the %s routes") % (i),
+                                        title = _("Upper levels"),
+                                        elements = [
+                                            Integer(title = _("warning if above")),
+                                            Integer(title = _("critical if above")),
+                                        ]),
+                                ),
+                            ],
+                            optional_keys = ["upper", "lower"],
+                        )) for i in ["imported", "filtered", "exported", "preferred"]
+                    ]
+                )
+            ),
+            ( "route_stats_levels_limit_warning_factor",
+                Percentage(title = _("Warning level for limit based thresholds"), unit = _("percent"), default_value = 90, minvalue = 0, maxvalue = 100),
             )
-        ),
-        ( "route_stats_levels_limit_warning_factor",
-            Percentage(title = _("Warning level for limit based thresholds"), unit = _("percent"), default_value = 90, minvalue = 0, maxvalue = 100),
-        )
-    ]
-)
+        ]
+    )
 
-bird_protocols_itemspec = TextAscii(
-    title = _("Protocol"),
-    allow_empty = False
-)
+def _item_spec_bird_protocols():
+    return TextAscii(
+        title = _("Protocol"),
+        allow_empty = False
+    )
 
 # register memory/protocols parameters for each BIRD version
 for bird_version in [ "", "6" ]:
-    register_check_parameters(
-        subgroup_applications,
-        "bird%s_memory" % (bird_version),
-        _("BIRD%s Memory" % (bird_version)),
-        bird_memory_valuespec,
-        None,
-        "dict"
-    )
+    rulespec_registry.register(
+        CheckParameterRulespecWithoutItem(
+            check_group_name="bird%s_memory" % bird_version,
+            group=RulespecGroupCheckParametersApplications,
+            match_type="dict",
+            parameter_valuespec=_parameter_valuespec_bird_memory,
+            title=lambda: _("BIRD%s Memory" % bird_version),
+        ))
 
-    register_check_parameters(
-        subgroup_applications,
-        "bird%s_protocols" % (bird_version),
-        _("BIRD%s Protocols" % (bird_version)),
-        bird_protocols_valuespec,
-        bird_protocols_itemspec,
-        "dict"
-)
-
-# Agent Bakery
-register_rule("agents/" + _("Agent Plugins"),
-    "agent_config:bird",
-    DropdownChoice(
-        title = _("BIRD Internet Routing Daemon (Linux)"),
-        help = _("This will deploy the agent plugin <tt>bird</tt> for checking the BIRD Internet Routing Daemon."),
-        choices = [
-            ( True, _("Deploy plugin for BIRD") ),
-            ( None, _("Do not deploy plugin for BIRD") ),
-        ]
-    )
-)
-
+    rulespec_registry.register(
+        CheckParameterRulespecWithItem(
+            check_group_name="bird%s_protocols" % bird_version,
+            group=RulespecGroupCheckParametersApplications,
+            item_spec=_item_spec_bird_protocols,
+            match_type="dict",
+            parameter_valuespec=_parameter_valuespec_bird_protocols,
+            title=lambda: _("BIRD%s Protocols" % bird_version),
+        ))

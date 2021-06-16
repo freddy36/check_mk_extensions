@@ -52,7 +52,8 @@ def _parameter_valuespec_bird_status():
                     default_value = 60
                 ),
             ),
-	]
+        ],
+        ignored_keys = ['config_files', 'memory', 'protocols', 'status', 'version'],
     )
 
 rulespec_registry.register(
@@ -78,7 +79,8 @@ def _parameter_valuespec_bird_memory():
                   ]
               ),
             )
-        ]
+        ],
+        ignored_keys = ['config_files', 'memory', 'protocols', 'status', 'version'],
     )
 
 # bird.protocols
@@ -120,7 +122,8 @@ def _parameter_valuespec_bird_protocols():
             ( "route_stats_levels_limit_warning_factor",
                 Percentage(title = _("Warning level for limit based thresholds"), unit = _("percent"), default_value = 90, minvalue = 0, maxvalue = 100),
             )
-        ]
+        ],
+        ignored_keys = ['config_files', 'memory', 'protocols', 'status', 'version'],
     )
 
 def _item_spec_bird_protocols():

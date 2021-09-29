@@ -454,7 +454,7 @@ register.check_plugin(
 register.check_plugin(
     name="bird6_status",
     service_name="BIRD6 Status",
-    sections=["bird"],
+    sections=["bird6"],
     discovery_function=discover_bird_status,
     check_function=check_bird_status,
     check_default_parameters=_bird_status_default_levels,
@@ -474,7 +474,7 @@ register.check_plugin(
 register.check_plugin(
     name="bird6_memory",
     service_name="BIRD6 Memory",
-    sections=["bird"],
+    sections=["bird6"],
     discovery_function=discover_bird_memory,
     check_function=check_bird_memory,
     check_default_parameters={},
@@ -494,7 +494,7 @@ register.check_plugin(
 register.check_plugin(
     name="bird6_protocols",
     service_name="BIRD6 Protocol %s",
-    sections=["bird"],
+    sections=["bird6"],
     discovery_function=discover_bird_protocols,
     check_function=check_bird_protocols,
     check_default_parameters=_bird_protocols_default_levels,

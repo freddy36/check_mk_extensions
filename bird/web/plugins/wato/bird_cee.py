@@ -19,29 +19,34 @@
 #
 # Copyright 2014 by Frederik Kriewitz <frederik@kriewitz.eu>.
 
-from cmk.gui.i18n import _
-from cmk.gui.plugins.wato import (
-    HostRulespec,
-    rulespec_registry,
-)
-from cmk.gui.cee.plugins.wato.agent_bakery.rulespecs.utils import RulespecGroupMonitoringAgentsAgentPlugins
-from cmk.gui.valuespec import (
-    DropdownChoice,
-)
-
-def _valuespec_agent_config_bird():
-    return DropdownChoice(
-        title = _("BIRD Internet Routing Daemon (Linux)"),
-        help = _("This will deploy the agent plugin <tt>bird</tt> for checking the BIRD Internet Routing Daemon."),
-        choices = [
-            ( True, _("Deploy plugin for BIRD") ),
-            ( None, _("Do not deploy plugin for BIRD") ),
-        ]
+try:
+    from cmk.gui.i18n import _
+    from cmk.gui.plugins.wato import (
+        HostRulespec,
+        rulespec_registry,
     )
+    from cmk.gui.cee.plugins.wato.agent_bakery.rulespecs.utils import RulespecGroupMonitoringAgentsAgentPlugins
+    from cmk.gui.valuespec import (
+        DropdownChoice,
+    )
+    
+    def _valuespec_agent_config_bird():
+        return DropdownChoice(
+            title = _("BIRD Internet Routing Daemon (Linux)"),
+            help = _("This will deploy the agent plugin <tt>bird</tt> for checking the BIRD Internet Routing Daemon."),
+            choices = [
+                ( True, _("Deploy plugin for BIRD") ),
+                ( None, _("Do not deploy plugin for BIRD") ),
+            ]
+        )
+    
+    rulespec_registry.register(
+        HostRulespec(
+            group=RulespecGroupMonitoringAgentsAgentPlugins,
+            name="agent_config:bird",
+            valuespec=_valuespec_agent_config_bird,
+        ))
 
-rulespec_registry.register(
-    HostRulespec(
-        group=RulespecGroupMonitoringAgentsAgentPlugins,
-        name="agent_config:bird",
-        valuespec=_valuespec_agent_config_bird,
-    ))
+except ModuleNotFoundError:
+    # RAW edition
+    pass

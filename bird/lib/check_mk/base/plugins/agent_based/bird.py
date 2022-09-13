@@ -114,9 +114,6 @@ from .agent_based_api.v1 import (
 import time
 import datetime
 
-from cmk.utils import debug
-from pprint import pprint
-
 _bird_status_default_levels = {
     "uptime_low_threshold": 300,
     "config_file_min_age": 60,
@@ -328,8 +325,6 @@ def check_bird_memory(params, section) -> CheckResult:
                                 label=name)
 
 def discover_bird_protocols(section) -> DiscoveryResult:
-    if debug.enabled():
-        pprint(section)
     for protocol in section.get('protocols', {}):
         yield Service(item=protocol, parameters=section)
 

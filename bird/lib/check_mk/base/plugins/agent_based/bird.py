@@ -251,10 +251,9 @@ register.agent_section(
 
 def discover_bird_status(section) -> DiscoveryResult:
     if 'status' in section: # bird is running
-        yield Service(parameters=section)
+        yield Service()
 
 def check_bird_status(params, section) -> CheckResult:
-    # params is a snapshot of the parsed data at the point of time of inventory
     if 'error' in section:
         yield Result(state=State.CRIT,
                      summary="ERROR: "+section['error'])
@@ -303,10 +302,9 @@ def check_bird_status(params, section) -> CheckResult:
 
 def discover_bird_memory(section) -> DiscoveryResult:
     if 'memory' in section: # bird is running
-        yield Service(parameters=section)
+        yield Service()
 
 def check_bird_memory(params, section) -> CheckResult:
-    # params is a snapshot of the parsed data at the point of time of inventory
     if 'error' in section:
         yield Result(state=State.CRIT,
                      summary="ERROR: "+section['error'])
@@ -326,11 +324,9 @@ def check_bird_memory(params, section) -> CheckResult:
 
 def discover_bird_protocols(section) -> DiscoveryResult:
     for protocol in section.get('protocols', {}):
-        yield Service(item=protocol, parameters=section)
+        yield Service(item=protocol, parameters={'protocols': { protocol: section['protocols'][protocol] }})
 
 def check_bird_protocols(item, params, section) -> CheckResult:
-    # params is a snapshot of the parsed data at the point of time of inventory
-
     this_time = time.time()
     if 'error' in section:
         yield Result(state=State.CRIT,

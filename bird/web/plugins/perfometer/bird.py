@@ -20,7 +20,7 @@
 # Copyright 2014 by Frederik Kriewitz <frederik@kriewitz.eu>.
 
 from cmk.gui.plugins.views.perfometers.check_mk import perfometer_check_mk_uptime
-from cmk.gui.plugins.views.perfometers import perfometer_logarithmic
+from cmk.gui.plugins.views.perfometers.check_mk import perfometer_logarithmic
 
 perfometers["check_mk-bird_status"]      = perfometer_check_mk_uptime
 perfometers["check_mk-bird6_status"]     = perfometer_check_mk_uptime

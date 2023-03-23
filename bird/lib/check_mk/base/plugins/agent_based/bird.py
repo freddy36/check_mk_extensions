@@ -137,7 +137,7 @@ def _bird_strptime(string):
 
 def _bird_si_to_int(value, unit):
     _prefix = {'': 1, 'k': 1024, 'M': 1048576, 'G': 1073741824}
-    return int(value) * _prefix[unit.rstrip('B')]
+    return int(value.split(".")[0]) * _prefix[unit.rstrip('B')]
 
 def _bird_x_to_key(value):
     return "_".join(value).rstrip(':')
@@ -319,7 +319,7 @@ def check_bird_memory(params, section) -> CheckResult:
                      summary="No memory data available")
         return
     for name, value_text, value_bytes in section['memory']:
-        key = name.replace(" ", "_")
+        key = name.replace(" ", "_").split(":")[0]  # memory part wasn't parsed correctly, quick fix
         warn, crit = params.get('memory_levels_'+key, (None, None))
         yield from check_levels(value_bytes,
                                 levels_upper=(warn, crit),

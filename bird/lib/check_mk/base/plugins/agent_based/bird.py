@@ -191,17 +191,17 @@ def parse_bird(string_table):
                 last_protocol['description'] = " ".join(line[2:])
             if line[1] == "Preference:":
                 last_protocol['preference'] = line[2]
-            elif line[2] == "filter:":
+            elif len(line) > 2 and line[2] == "filter:":
                 key = _bird_x_to_key(line[1:3])
                 last_protocol[key] = " ".join(line[3:])
-            elif line[2] == "limit:" and line[1] != 'Route':
+            elif len(line) > 2 and line[2] == "limit:" and line[1] != 'Route':
                 limits = last_protocol.setdefault('limits', {})
                 last_limit = limits[line[1]] = {}
                 last_limit['value'] = int(line[3])
                 last_limit['hit'] = (len(line) >= 5 and line[4] == "[HIT]")
             elif line[1] == "Action:":
                 last_limit['action'] = line[2]
-            elif line[2] == "limit:" and line[1] == 'Route': # legacy "route limit" option
+            elif len(line) > 2 and line[2] == "limit:" and line[1] == 'Route': # legacy "route limit" option
                 limits = last_protocol.setdefault('limits', {})
                 if 'Import' in limits:
                     continue # ignore in case we already have a import limit

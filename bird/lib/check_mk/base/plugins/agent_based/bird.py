@@ -170,9 +170,14 @@ def parse_bird(string_table):
         elif code == 1018:
             if line[-1][-1] == 'B': # ignore lines which don't end vith B (not memory stats)
                 memory = section.setdefault('memory', [])
-                name = " ".join(line[1:-2]).rstrip(":")
-                value_text = " ".join(line[-2:])
-                value_bytes = _bird_si_to_int(line[-2], line[-1])
+                split_index = next(filter(lambda i: ':' in line[i], range(1, len(line))))
+                name = " ".join(line[1:split_index+1]).rstrip(":")
+                if split_index == len(line) - 5:
+                    value_text = "E={} {}; O={} {}".format(*line[-4:])
+                    value_bytes = _bird_si_to_int(line[-4], line[-3]) + _bird_si_to_int(line[-2], line[-1])
+                else:
+                    value_text = " ".join(line[split_index+1:])
+                    value_bytes = _bird_si_to_int(line[-2], line[-1])
                 memory.append((name, value_text, value_bytes))
         elif code == 1002:
             protocols = section.setdefault('protocols', {})

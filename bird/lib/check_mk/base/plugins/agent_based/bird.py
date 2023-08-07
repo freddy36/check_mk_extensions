@@ -134,7 +134,7 @@ def _bird_strptime(string):
 
 def _bird_si_to_int(value, unit):
     _prefix = {'': 1, 'k': 1024, 'M': 1048576, 'G': 1073741824}
-    return int(value) * _prefix[unit.rstrip('B')]
+    return int(float(value) * _prefix[unit.rstrip('B')])
 
 def _bird_x_to_key(value):
     return "_".join(value).rstrip(':')

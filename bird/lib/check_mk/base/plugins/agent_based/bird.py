@@ -125,7 +125,7 @@ _bird_protocols_default_levels = {
 
 def _bird_strptime(string):
     # bird uses different time formats depending on the version/settings
-    for f in ['%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']:
+    for f in ['%d-%m-%Y %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S.%f', '%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']:
         try:
             return datetime.datetime.strptime(string, f)
         except ValueError:
@@ -134,7 +134,7 @@ def _bird_strptime(string):
 
 def _bird_si_to_int(value, unit):
     _prefix = {'': 1, 'k': 1024, 'M': 1048576, 'G': 1073741824}
-    return int(value) * _prefix[unit.rstrip('B')]
+    return int(value.split(".")[0]) * _prefix[unit.rstrip('B')]
 
 def _bird_x_to_key(value):
     return "_".join(value).rstrip(':')
@@ -191,17 +191,17 @@ def parse_bird(string_table):
                 last_protocol['description'] = " ".join(line[2:])
             if line[1] == "Preference:":
                 last_protocol['preference'] = line[2]
-            elif line[2] == "filter:":
+            elif len(line) >= 3 and line[2] == "filter:":
                 key = _bird_x_to_key(line[1:3])
                 last_protocol[key] = " ".join(line[3:])
-            elif line[2] == "limit:" and line[1] != 'Route':
+            elif len(line) >= 3 and line[2] == "limit:" and line[1] != 'Route':
                 limits = last_protocol.setdefault('limits', {})
                 last_limit = limits[line[1]] = {}
                 last_limit['value'] = int(line[3])
                 last_limit['hit'] = (len(line) >= 5 and line[4] == "[HIT]")
             elif line[1] == "Action:":
                 last_limit['action'] = line[2]
-            elif line[2] == "limit:" and line[1] == 'Route': # legacy "route limit" option
+            elif len(line) >= 3 and line[2] == "limit:" and line[1] == 'Route': # legacy "route limit" option
                 limits = last_protocol.setdefault('limits', {})
                 if 'Import' in limits:
                     continue # ignore in case we already have a import limit
@@ -314,7 +314,7 @@ def check_bird_memory(params, section) -> CheckResult:
                      summary="No memory data available")
         return
     for name, value_text, value_bytes in section['memory']:
-        key = name.replace(" ", "_")
+        key = name.replace(" ", "_").split(":")[0]  # memory part wasn't parsed correctly, quick fix
         warn, crit = params.get('memory_levels_'+key, (None, None))
         yield from check_levels(value_bytes,
                                 levels_upper=(warn, crit),

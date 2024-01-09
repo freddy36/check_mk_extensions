@@ -134,7 +134,7 @@ def _bird_strptime(string):
 
 def _bird_si_to_int(value, unit):
     _prefix = {'': 1, 'k': 1024, 'M': 1048576, 'G': 1073741824}
-    return int(value.split(".")[0]) * _prefix[unit.rstrip('B')]
+    return int(float(value) * _prefix[unit.rstrip('B')])
 
 def _bird_x_to_key(value):
     return "_".join(value).rstrip(':')
@@ -170,9 +170,14 @@ def parse_bird(string_table):
         elif code == 1018:
             if line[-1][-1] == 'B': # ignore lines which don't end vith B (not memory stats)
                 memory = section.setdefault('memory', [])
-                name = " ".join(line[1:-2]).rstrip(":")
-                value_text = " ".join(line[-2:])
-                value_bytes = _bird_si_to_int(line[-2], line[-1])
+                split_index = next(filter(lambda i: ':' in line[i], range(1, len(line))))
+                name = " ".join(line[1:split_index+1]).rstrip(":")
+                if split_index == len(line) - 5:
+                    value_text = "E={} {}; O={} {}".format(*line[-4:])
+                    value_bytes = _bird_si_to_int(line[-4], line[-3]) + _bird_si_to_int(line[-2], line[-1])
+                else:
+                    value_text = " ".join(line[split_index+1:])
+                    value_bytes = _bird_si_to_int(line[-2], line[-1])
                 memory.append((name, value_text, value_bytes))
         elif code == 1002:
             protocols = section.setdefault('protocols', {})

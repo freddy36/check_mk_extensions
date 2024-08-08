@@ -26,14 +26,14 @@ perfometers["check_mk-bird_status"]      = perfometer_check_mk_uptime
 perfometers["check_mk-bird6_status"]     = perfometer_check_mk_uptime
 
 def perfometer_check_mk_bird_protocols(row, check_command, perf_data):
-    value = int(list(filter(lambda x: x[0] == "route_stats_imported", perf_data))[0][1])
+    value = list(filter(lambda x: x.metric_name == "route_stats_imported", perf_data))[0].value
     return "%d imported" % value, perfometer_logarithmic(value, 20000 , 2 , "#da6")
 
 perfometers["check_mk-bird_protocols"]   = perfometer_check_mk_bird_protocols
 perfometers["check_mk-bird6_protocols"]  = perfometer_check_mk_bird_protocols
 
 def perfometer_check_mk_bird_memory(row, check_command, perf_data):
-    value = int(list(filter(lambda x: x[0] == "Total", perf_data))[0][1])
+    value = list(filter(lambda x: x.metric_name == "Total", perf_data))[0].value
     value_mb = value/1024/1024
     return "%d MB" % value_mb, perfometer_logarithmic(value_mb, 500 , 2 , "#80ff40")
 

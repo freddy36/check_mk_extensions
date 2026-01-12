@@ -404,7 +404,12 @@ def check_bird_protocols(item, params, section) -> CheckResult:
     for key, value in protocol.get('route_stats', {}).items():
         bounds = limit_bounds.get(key, {})
         if key in route_stats_levels:
-            bounds.update({key: ("fixed", route_stats_levels[key])})
+            for direction in route_stats_levels[key]:
+                blimits = route_stats_levels[key][direction]
+                if blimits[0] in ["fixed", "no_levels"]:
+                    bounds[direction] = route_stats_levels[key][direction]
+                else:
+                    bounds[direction] = ("fixed", route_stats_levels[key][direction])
         yield from check_levels(
             value,
             levels_upper=bounds.get('upper'),
